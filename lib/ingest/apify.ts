@@ -41,7 +41,7 @@ export async function downloadYoutubeViaApify(
   const input =
     kind === "audio"
       ? { videoUrls: [youtubeUrl(videoId)], format: "m4a" }
-      : { videoUrls: [youtubeUrl(videoId)], quality: "360p", format: "mp4" };
+      : { videoUrls: [youtubeUrl(videoId)], quality: "720p", format: "mp4" };
   const start = await fetch(
     `https://api.apify.com/v2/acts/${ACTOR}/runs?token=${encodeURIComponent(token)}`,
     {
@@ -62,9 +62,19 @@ export async function downloadYoutubeViaApify(
     `https://api.apify.com/v2/datasets/${datasetId}/items?token=${encodeURIComponent(token)}`,
     { signal: AbortSignal.timeout(20_000) },
   );
-  const items = (await itemsRes.json()) as Array<{ status?: string; downloadUrl?: string }>;
+  const items = (await itemsRes.json()) as Array<{
+    status?: string;
+    downloadUrl?: string;
+    error?: string;
+    errorType?: string;
+  }>;
   const url = items.find((i) => i.downloadUrl)?.downloadUrl;
-  if (!url) throw new Error("Apify returned no downloadUrl");
+  if (!url) {
+    if (!items.length) throw new Error("Apify returned no dataset items for this video");
+    const failed = items.find((i) => i.status === "failed") ?? items[0];
+    const reason = failed.error || failed.errorType || failed.status || "unknown reason";
+    throw new Error(`Apify could not download this video: ${reason}`);
+  }
   const file = await fetch(withToken(url, token), { signal: AbortSignal.timeout(180_000) });
   if (!file.ok) throw new Error(`Apify file ${file.status}`);
   await writeFile(dest, Buffer.from(await file.arrayBuffer()));
