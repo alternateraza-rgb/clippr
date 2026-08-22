@@ -172,7 +172,7 @@ export function ClipPreview({
           <GameplayPane track={gameplay} />
         </div>
       ) : null}
-      <CaptionTrack lines={captionLines} time={time} preset={preset} />
+      <CaptionTrack lines={captionLines} time={time} preset={preset} animate={playing} />
       {!playing ? (
         <button
           type="button"

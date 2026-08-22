@@ -8,17 +8,19 @@ export function CaptionTrack({
   lines,
   time,
   preset,
+  animate = true,
 }: {
   lines: CaptionLine[];
   time: number;
   preset: CaptionPreset;
+  animate?: boolean;
 }) {
   const line =
     lines.find((l) => time >= l.start && time < l.end) ??
     lines.find((l) => time >= l.start - 0.04 && time < l.end + 0.09);
   if (!line || line.words.length === 0) return null;
 
-  const exit = groupExit(time, line.end);
+  const exit = animate ? groupExit(time, line.end) : { opacity: 1, scale: 1 };
   const goldIndex = line.words.findIndex((w) => isKeyword(w));
 
   return (
@@ -40,12 +42,13 @@ export function CaptionTrack({
       }}
     >
       {line.words.map((word, i) => {
-        const localMs = (time - word.start) * 1000;
+        const started = !animate || time + 0.02 >= word.start;
+        const localMs = animate ? (time - word.start) * 1000 : 200;
         const motion = wordMotion(localMs, word, i, {
           preset,
-          stayGold: preset === "hormozi" && i === goldIndex && time >= word.start,
+          stayGold: preset === "hormozi" && i === goldIndex && started,
         });
-        if (!motion.visible && localMs < 0) {
+        if (!motion.visible) {
           return (
             <span
               key={`${word.start}-${i}`}
@@ -66,7 +69,12 @@ export function CaptionTrack({
             style={{
               opacity: motion.opacity,
               color: motion.text,
-              backgroundColor: preset === "hormozi" ? motion.fill === "#F5E27A" ? "#F5E27A" : "#0c0a09" : "transparent",
+              backgroundColor:
+                preset === "hormozi"
+                  ? motion.fill === "#F5E27A"
+                    ? "#F5E27A"
+                    : "#0c0a09"
+                  : "transparent",
               boxShadow:
                 preset === "hormozi"
                   ? motion.glow
