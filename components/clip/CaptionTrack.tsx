@@ -43,7 +43,7 @@ export function CaptionTrack({
     >
       {line.words.map((word, i) => {
         const started = !animate || time + 0.02 >= word.start;
-        const localMs = animate ? (time - word.start) * 1000 : 200;
+        const localMs = animate ? (time - word.start) * 1000 : 800;
         const motion = wordMotion(localMs, word, i, {
           preset,
           stayGold: preset === "hormozi" && i === goldIndex && started,
