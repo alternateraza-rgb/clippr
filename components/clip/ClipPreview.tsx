@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CaptionTrack } from "@/components/clip/CaptionTrack";
 import { GameplayPane } from "@/components/clip/GameplayPane";
 import { cn } from "@/lib/cn";
+import { createPlaybackClock } from "@/lib/captions/clock";
 import type { CaptionLine, CaptionPreset, GameplayTrack } from "@/lib/agent/types";
 
 type ClipPreviewProps = {
@@ -44,6 +45,10 @@ function ytCommand(frame: HTMLIFrameElement, func: string, args: unknown[] = [])
   frame.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), "*");
 }
 
+function ytListen(frame: HTMLIFrameElement) {
+  frame.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: "clip-preview" }), "*");
+}
+
 export function ClipPreview({
   videoId,
   start,
@@ -56,7 +61,9 @@ export function ClipPreview({
   className,
 }: ClipPreviewProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const clockRef = useRef(createPlaybackClock());
   const [playing, setPlaying] = useState(autoPlay);
+  const [time, setTime] = useState(0);
   const split = gameplay !== "none";
   const span = Math.max(duration, 0.1);
   const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -69,6 +76,41 @@ export function ClipPreview({
     setPlaying(autoPlay);
   }, [videoId, start, autoPlay]);
 
+  // Anchor the caption clock to the iframe's real playback position instead
+  // of assuming autoplay started the instant we requested it.
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      if (typeof event.data !== "string" || !/youtube/.test(event.origin)) return;
+      let payload: { event?: string; info?: { currentTime?: number } };
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (payload.event !== "infoDelivery") return;
+      const currentTime = payload.info?.currentTime;
+      if (typeof currentTime !== "number") return;
+      clockRef.current.sync(Math.max(0, currentTime - start));
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [start]);
+
+  useEffect(() => {
+    clockRef.current.reset();
+    let raf = 0;
+    const tick = () => {
+      setTime(playing ? clockRef.current.elapsed() : 0);
+      if (playing) raf = window.requestAnimationFrame(tick);
+    };
+    raf = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(raf);
+  }, [playing, videoId, start]);
+
+  function handleFrameLoad() {
+    if (frameRef.current) ytListen(frameRef.current);
+  }
+
   function handlePlay() {
     const url = embedSrc(videoId, start, span, true, origin);
     const frame = frameRef.current;
@@ -77,6 +119,7 @@ export function ClipPreview({
       frame.src = url;
       window.setTimeout(() => {
         if (!frameRef.current) return;
+        ytListen(frameRef.current);
         ytCommand(frameRef.current, "unMute");
         ytCommand(frameRef.current, "playVideo");
       }, 200);
@@ -95,6 +138,7 @@ export function ClipPreview({
           key={`${videoId}-${Math.floor(start)}`}
           title="Clip preview"
           src={src}
+          onLoad={handleFrameLoad}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen={false}
           className="pointer-events-none absolute left-1/2 top-1/2 h-[120%] w-[185%] -translate-x-1/2 -translate-y-1/2 border-0"
@@ -121,7 +165,7 @@ export function ClipPreview({
           lines={captionLines}
           preset={preset}
           playing={playing}
-          clipStart={start}
+          time={time}
           duration={span}
           fallback={fallbackText}
         />

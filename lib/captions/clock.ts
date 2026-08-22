@@ -48,11 +48,30 @@ export function stickyCaptionLine(lines: CaptionLine[], time: number): CaptionLi
 }
 
 /**
- * Clip-relative caption clock.
- * YouTube `start=` is integer seconds, so a 522.7s cut begins 0.7s late in captions.
+ * Anchors the caption clock to the iframe's real playback position instead of
+ * assuming autoplay started the instant we asked it to. Call `sync()` whenever
+ * a fresh `currentTime` arrives from the YouTube IFrame API (`infoDelivery`),
+ * then `elapsed()` interpolates from that anchor with a local timer between
+ * messages so the clock stays smooth without drifting.
  */
-export function clipElapsed(originMs: number, videoStart: number, now = performance.now()) {
-  const elapsed = (now - originMs) / 1000;
-  const pad = videoStart - Math.floor(videoStart);
-  return Math.max(0, elapsed - pad);
+export function createPlaybackClock() {
+  let anchorMs = performance.now();
+  let anchorTime = 0;
+  let live = false;
+  return {
+    sync(currentTime: number, now = performance.now()) {
+      anchorMs = now;
+      anchorTime = Math.max(0, currentTime);
+      live = true;
+    },
+    reset() {
+      anchorMs = performance.now();
+      anchorTime = 0;
+      live = false;
+    },
+    elapsed(now = performance.now()) {
+      if (!live) return 0;
+      return Math.max(0, anchorTime + (now - anchorMs) / 1000);
+    },
+  };
 }

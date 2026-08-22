@@ -4,8 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAdminClient } from "../../lib/supabase/admin";
 import { captionLinesForRange } from "../../lib/agent/compose";
-import type { CaptionLine, CaptionPreset, RenderStatus } from "../../lib/agent/types";
+import { jumpCutDuration, planJumpCuts, remapCaptionLines, type Interval } from "../../lib/agent/jumpcuts";
+import type { CaptionLine, CaptionPreset, RenderStatus, WordTiming } from "../../lib/agent/types";
 import { buildAss } from "./ass";
+import { biasedCrop, jumpCutChain, kenBurnsZoom } from "./filters";
 import { run } from "./exec";
 import { transcribeFile } from "./whisper";
 import { cutReencode, downloadSource } from "./media";
@@ -54,6 +56,28 @@ async function fetchGameplayLoop(
   return dest;
 }
 
+async function probeFps(file: string): Promise<number> {
+  try {
+    const { stdout } = await run("ffprobe", [
+      "-v",
+      "error",
+      "-select_streams",
+      "v:0",
+      "-show_entries",
+      "stream=r_frame_rate",
+      "-of",
+      "default=noprint_wrappers=1:nokey=1",
+      file,
+    ]);
+    const raw = stdout.trim();
+    const [num, den] = raw.split("/").map(Number);
+    if (den) return num / den;
+    return Number(raw) || 30;
+  } catch {
+    return 30;
+  }
+}
+
 export async function processRender(renderId: string) {
   const admin = createAdminClient();
   if (!admin) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
@@ -82,105 +106,135 @@ export async function processRender(renderId: string) {
     await run("ffmpeg", ["-y", "-i", raw, "-vn", "-ac", "1", "-ar", "16000", "-b:a", "64k", audio]);
 
     let lines = Array.isArray(row.caption_lines) ? row.caption_lines : [];
-    let asr: "captions" | "whisper" = lines.length ? "captions" : "whisper";
-    try {
-      const transcript = await transcribeFile(audio);
-      if (transcript.words.length) {
-        const last = transcript.words[transcript.words.length - 1]?.end ?? end - start;
-        lines = captionLinesForRange(transcript.words, 0, last + 0.05);
-        asr = "whisper";
+    let asr = lines.length ? "captions" : "whisper";
+    let words: WordTiming[] = [];
+    let whisperOk = false;
+    for (let attempt = 0; attempt < 2 && !whisperOk; attempt++) {
+      try {
+        const transcript = await transcribeFile(audio);
+        if (transcript.words.length) {
+          words = transcript.words;
+          const last = words[words.length - 1]?.end ?? duration;
+          lines = captionLinesForRange(words, 0, last + 0.05);
+          asr = "whisper";
+          whisperOk = true;
+        }
+      } catch (err) {
+        if (attempt === 1) {
+          if (!lines.length) throw err;
+          asr = "captions-approx";
+          console.error("[render] whisper failed twice, falling back to approximate captions", err);
+        }
       }
-    } catch (err) {
-      if (!lines.length) throw err;
     }
+
+    // Only jump-cut dead air when we trust the word timing it's based on —
+    // cutting video on fabricated/approximate timestamps would slice into
+    // real speech.
+    const plan = whisperOk
+      ? planJumpCuts(words, duration)
+      : ({ keep: [[0, duration] as Interval], removed: [] } as { keep: Interval[]; removed: Interval[] });
+    const editedLines = plan.removed.length ? remapCaptionLines(lines, plan.removed) : lines;
+    const outDuration = plan.removed.length ? jumpCutDuration(duration, plan.removed) : duration;
 
     await setStatus(renderId, {
       status: "rendering",
       progress: 62,
       asr_source: asr,
-      caption_lines: lines,
+      caption_lines: editedLines,
     });
 
-    const assPath = join(dir, "captions.ass");
-    await writeFile(assPath, buildAss(lines, row.caption_preset ?? "hormozi"), "utf8");
+    const preset = row.caption_preset ?? "hormozi";
+    const assEditedPath = join(dir, "captions.ass");
+    await writeFile(assEditedPath, buildAss(editedLines, preset), "utf8");
+    const assPlainPath = plan.removed.length ? join(dir, "captions-plain.ass") : assEditedPath;
+    if (plan.removed.length) {
+      await writeFile(assPlainPath, buildAss(lines, preset), "utf8");
+    }
+
     const out = join(dir, "out.mp4");
     const fontsDir = existsSync("/usr/share/fonts/truetype/clipmuse")
       ? ":fontsdir=/usr/share/fonts/truetype/clipmuse"
       : existsSync("/usr/share/fonts/truetype/liberation")
         ? ":fontsdir=/usr/share/fonts/truetype/liberation"
         : "";
-    const assFilter = `ass=${assPath.replace(/\\/g, "/").replace(/:/g, "\\:")}${fontsDir}`;
     const gameplayFile = await fetchGameplayLoop(dir, row.gameplay, admin);
+    const fps = await probeFps(raw);
 
-    const vf = gameplayFile
-      ? [
-          "[0:v]scale=720:692:force_original_aspect_ratio=increase,crop=720:692[top]",
-          "[1:v]scale=720:588:force_original_aspect_ratio=increase,crop=720:588[bot]",
-          "[top][bot]vstack=inputs=2[stack]",
-          `[stack]${assFilter}[v]`,
-        ].join(";")
-      : [
-          "scale=720:1280:force_original_aspect_ratio=increase",
-          "crop=720:1280",
-          assFilter,
-        ].join(",");
-    const ffArgs = gameplayFile
-      ? [
-          "-y",
-          "-i",
-          raw,
-          "-stream_loop",
-          "-1",
-          "-i",
-          gameplayFile,
-          "-t",
-          duration.toFixed(2),
-          "-filter_complex",
-          vf,
-          "-map",
-          "[v]",
-          "-map",
-          "0:a?",
-          "-c:v",
-          "libx264",
-          "-preset",
-          "ultrafast",
-          "-crf",
-          "23",
-          "-c:a",
-          "aac",
-          "-b:a",
-          "128k",
-          "-shortest",
-          "-movflags",
-          "+faststart",
-          "-pix_fmt",
-          "yuv420p",
-          out,
-        ]
-      : [
-          "-y",
-          "-i",
-          raw,
-          "-vf",
-          vf,
-          "-c:v",
-          "libx264",
-          "-preset",
-          "ultrafast",
-          "-crf",
-          "23",
-          "-c:a",
-          "aac",
-          "-b:a",
-          "128k",
-          "-movflags",
-          "+faststart",
-          "-pix_fmt",
-          "yuv420p",
-          out,
-        ];
-    await run("ffmpeg", ffArgs);
+    function buildArgs(opts: { withEdits: boolean; keep: Interval[]; assPath: string; outDuration: number }) {
+      const assFilter = `ass=${opts.assPath.replace(/\\/g, "/").replace(/:/g, "\\:")}${fontsDir}`;
+      const zoom = opts.withEdits;
+      const parts: string[] = [];
+      let videoLabel: string;
+      let audioMap: string;
+
+      if (opts.withEdits && opts.keep.length > 1) {
+        parts.push(jumpCutChain(opts.keep, { v: "0:v", a: "0:a" }, { v: "vcat", a: "acat" }));
+        videoLabel = "[vcat]";
+        audioMap = "[acat]";
+      } else {
+        videoLabel = "[0:v]";
+        audioMap = "0:a?";
+      }
+
+      if (gameplayFile) {
+        let top = `${videoLabel}scale=720:692:force_original_aspect_ratio=increase,${biasedCrop(720, 692)}`;
+        if (zoom) top += `,${kenBurnsZoom(720, 692, fps)}`;
+        parts.push(`${top}[top]`);
+        parts.push("[1:v]scale=720:588:force_original_aspect_ratio=increase,crop=720:588[bot]");
+        parts.push("[top][bot]vstack=inputs=2[stack]");
+        parts.push(`[stack]${assFilter}[vout]`);
+      } else {
+        let main = `${videoLabel}scale=720:1280:force_original_aspect_ratio=increase,${biasedCrop(720, 1280)}`;
+        if (zoom) main += `,${kenBurnsZoom(720, 1280, fps)}`;
+        parts.push(`${main}[vpre]`);
+        parts.push(`[vpre]${assFilter}[vout]`);
+      }
+
+      const filterComplex = parts.filter(Boolean).join(";");
+      return [
+        "-y",
+        "-i",
+        raw,
+        ...(gameplayFile ? ["-stream_loop", "-1", "-i", gameplayFile] : []),
+        "-t",
+        opts.outDuration.toFixed(2),
+        "-filter_complex",
+        filterComplex,
+        "-map",
+        "[vout]",
+        "-map",
+        audioMap,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-crf",
+        "23",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        ...(gameplayFile ? ["-shortest"] : []),
+        "-movflags",
+        "+faststart",
+        "-pix_fmt",
+        "yuv420p",
+        out,
+      ];
+    }
+
+    let finalDuration = outDuration;
+    try {
+      await run("ffmpeg", buildArgs({ withEdits: true, keep: plan.keep, assPath: assEditedPath, outDuration }));
+    } catch (renderErr) {
+      console.error("[render] edited pass failed, falling back to plain crop", renderErr);
+      finalDuration = duration;
+      await run(
+        "ffmpeg",
+        buildArgs({ withEdits: false, keep: [[0, duration]], assPath: assPlainPath, outDuration: duration }),
+      );
+    }
 
     const bytes = await readFile(out);
     const info = await stat(out);
@@ -196,7 +250,7 @@ export async function processRender(renderId: string) {
       progress: 100,
       output_path: outputPath,
       output_bytes: info.size,
-      duration_s: end - start,
+      duration_s: finalDuration,
       finished_at: new Date().toISOString(),
       error: null,
     });

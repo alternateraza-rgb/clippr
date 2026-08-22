@@ -1,4 +1,7 @@
+import { explodeWords } from "../../lib/agent/words";
 import type { TranscriptSegment, WordTiming } from "../../lib/agent/types";
+
+export { explodeWords };
 
 function parseClock(raw: string) {
   const parts = raw.trim().split(":");
@@ -34,21 +37,6 @@ export function parseVtt(raw: string): TranscriptSegment[] {
     segments.push({ start, end, text });
   }
   return segments;
-}
-
-export function explodeWords(segments: TranscriptSegment[]): WordTiming[] {
-  const words: WordTiming[] = [];
-  for (const seg of segments) {
-    const tokens = seg.text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
-    if (!tokens.length) continue;
-    const span = Math.max(seg.end - seg.start, 0.2);
-    tokens.forEach((text, i) => {
-      const start = seg.start + (span * i) / tokens.length;
-      const end = seg.start + (span * (i + 1)) / tokens.length;
-      words.push({ text, start, end });
-    });
-  }
-  return words;
 }
 
 export function segmentsFromWords(words: WordTiming[]): TranscriptSegment[] {

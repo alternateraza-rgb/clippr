@@ -1,7 +1,7 @@
 import { captionLinesForRange } from "@/lib/agent/compose";
 import { heuristicCandidates } from "@/lib/agent/heuristic";
 import { RUBRIC } from "@/lib/agent/rubric";
-import { snapRange } from "@/lib/agent/snap";
+import { snapRange, tightenRange } from "@/lib/agent/snap";
 import { pickOffset } from "@/lib/agent/time";
 import { timedScript, type TranscriptResult } from "@/lib/agent/transcript";
 import { hasLlm } from "@/lib/config";
@@ -43,8 +43,9 @@ function toCandidates(raw: unknown, words: WordTiming[]): ClipCandidate[] {
       if (startRaw == null || endRaw == null) return null;
       const hook = String(c.hook || c.title || "").slice(0, 220);
       const snapped = snapRange(startRaw, Math.max(startRaw + 8, endRaw), hook, words);
-      const start = snapped.start;
-      const finish = snapped.end;
+      const tightened = tightenRange(words, snapped.start, snapped.end);
+      const start = tightened.start;
+      const finish = tightened.end;
       const nested = (c.scores && typeof c.scores === "object" ? c.scores : c) as Record<string, unknown>;
       const scores: ScoreBreakdown = {
         hook: clampScore(nested.hook),

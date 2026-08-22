@@ -130,7 +130,7 @@ export async function POST(request: Request) {
       "-i",
       raw,
       "-vf",
-      "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280",
+      "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280:(iw-720)/2:(ih-1280)*0.32",
       "-c:v",
       "libx264",
       "-preset",

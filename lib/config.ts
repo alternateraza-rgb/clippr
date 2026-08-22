@@ -58,5 +58,5 @@ export function llmProvider() {
 
 export function llmModel() {
   if (env("LLM_MODEL")) return env("LLM_MODEL");
-  return llmProvider() === "anthropic" ? "claude-sonnet-4-20250514" : "gpt-4o-mini";
+  return llmProvider() === "anthropic" ? "claude-sonnet-4-20250514" : "gpt-4o";
 }

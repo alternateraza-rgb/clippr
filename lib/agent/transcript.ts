@@ -1,5 +1,8 @@
 import { getSubtitles, getVideoDetails } from "youtube-caption-extractor";
+import { explodeWords } from "@/lib/agent/words";
 import type { TranscriptSegment, WordTiming } from "@/lib/agent/types";
+
+export { explodeWords };
 
 export class CaptionsDisabledError extends Error {
   constructor(message = "Captions are disabled on this video") {
@@ -15,25 +18,6 @@ export type TranscriptResult = {
   source: "captions" | "whisper" | "none";
   title?: string;
 };
-
-export function explodeWords(segments: TranscriptSegment[]): WordTiming[] {
-  const words: WordTiming[] = [];
-  for (const seg of segments) {
-    const tokens = seg.text
-      .replace(/\s+/g, " ")
-      .trim()
-      .split(" ")
-      .filter(Boolean);
-    if (!tokens.length) continue;
-    const span = Math.max(seg.end - seg.start, 0.2);
-    tokens.forEach((text, i) => {
-      const start = seg.start + (span * i) / tokens.length;
-      const end = seg.start + (span * (i + 1)) / tokens.length;
-      words.push({ text, start, end });
-    });
-  }
-  return words;
-}
 
 export async function fetchTranscript(videoId: string): Promise<TranscriptResult> {
   try {
@@ -77,7 +61,7 @@ function decode(text: string) {
     .trim();
 }
 
-export function timedScript(segments: TranscriptSegment[], maxChars = 28_000) {
+export function timedScript(segments: TranscriptSegment[], maxChars = 120_000) {
   const lines = segments.map((seg) => {
     const m = Math.floor(seg.start / 60);
     const s = Math.floor(seg.start % 60)

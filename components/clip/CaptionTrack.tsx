@@ -1,13 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { cn } from "@/lib/cn";
-import {
-  clipElapsed,
-  fallbackCaptionLine,
-  normalizeCaptionLines,
-  stickyCaptionLine,
-} from "@/lib/captions/clock";
+import { fallbackCaptionLine, normalizeCaptionLines, stickyCaptionLine } from "@/lib/captions/clock";
 import { GOLD, INK, WHITE, isKeyword } from "@/lib/captions/motion";
 import type { CaptionLine, CaptionPreset } from "@/lib/agent/types";
 
@@ -15,34 +10,24 @@ export function CaptionTrack({
   lines,
   preset,
   playing = false,
-  clipStart = 0,
+  time = 0,
   duration = 12,
   fallback = "",
 }: {
   lines: CaptionLine[];
   preset: CaptionPreset;
   playing?: boolean;
-  clipStart?: number;
+  /** Clip-relative playback position in seconds, driven by the real player clock. */
+  time?: number;
   duration?: number;
   fallback?: string;
 }) {
-  const [time, setTime] = useState(0);
   const prepared = useMemo(() => {
     const normalized = normalizeCaptionLines(lines, duration);
     if (normalized.length) return normalized;
     if (fallback.trim()) return [fallbackCaptionLine(fallback, duration)];
     return [];
   }, [lines, duration, fallback]);
-
-  useEffect(() => {
-    setTime(0);
-    if (!playing) return;
-    const origin = performance.now();
-    const tick = () => setTime(clipElapsed(origin, clipStart));
-    tick();
-    const id = window.setInterval(tick, 80);
-    return () => window.clearInterval(id);
-  }, [playing, clipStart, duration]);
 
   const line = stickyCaptionLine(prepared, time);
   if (!line) return <p className="sr-only">No captions for this window</p>;
