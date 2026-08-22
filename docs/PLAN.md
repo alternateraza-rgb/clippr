@@ -1,6 +1,6 @@
 # Clipmuse live product
 
-App stays on **Vercel**. Heavy work (yt-dlp, Whisper, ffmpeg) runs on a **Render** Docker worker. OpenAI is the brain. YouTube Data API finds longform. After onboarding, Home is a researched feed — not fixtures.
+App stays on **Vercel**. YouTube download runs on a **home worker** (`npm run worker` + tunnel) because Render datacenter IPs get YouTube’s bot check. OpenAI is the brain. YouTube Data API finds longform. After onboarding, Home is a researched feed — not fixtures.
 
 ## Loop
 

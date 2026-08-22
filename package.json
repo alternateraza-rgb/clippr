@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "spike": "tsx scripts/spike.ts",
-    "worker": "tsx worker/src/server.ts"
+    "worker": "tsx worker/src/server.ts",
+    "worker:tunnel": "npx --yes cloudflared tunnel --url http://127.0.0.1:8787"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

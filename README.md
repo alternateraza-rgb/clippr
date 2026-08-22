@@ -1,6 +1,6 @@
 # Clipmuse
 
-Premium clipping studio. Paste a YouTube URL; the agent reads the transcript, scores high-retention moments, and previews a captioned 9:16 cut. Home/Ideas are live YouTube longform ranked by OpenAI. Export burns captions into an mp4 on a Render worker.
+Premium clipping studio. Paste a YouTube URL; the agent reads the transcript, scores high-retention moments, and previews a captioned 9:16 cut. Home/Ideas are live YouTube longform ranked by OpenAI. Export burns captions into an mp4 on the worker (run it on your PC so YouTube is not blocked).
 
 ```bash
 cp .env.example .env.local
@@ -28,10 +28,21 @@ npm run worker               # local render worker (needs yt-dlp + ffmpeg)
 | `SUPABASE_URL` | Same project URL; worker can use this instead of the `NEXT_PUBLIC_` key |
 | `NEXT_PUBLIC_SITE_URL` | Canonical origin for auth email links |
 | `CRON_SECRET` | If set, `/api/discovery/refresh` requires `Authorization: Bearer …` (Vercel Cron sends this) |
-| `CLIP_WORKER_URL` | Public URL of the Render worker, no trailing slash |
-| `CLIP_WORKER_SECRET` | Shared secret. Same value on Vercel and Render |
+| `CLIP_WORKER_URL` | Public URL of the **home** worker tunnel (or Render). No trailing slash |
+| `CLIP_WORKER_SECRET` | Shared secret. Same value on Vercel and the worker |
 | `ENABLE_LOCAL_EXPORT` | `true` to render an mp4 on this machine when the worker is not configured |
 | `CLIPMUSE_MODE` | `demo` forces fixtures; `live` is default |
+
+## Home worker (YouTube download)
+
+YouTube blocks yt-dlp on Render. Run the worker on your PC and point Vercel at a tunnel. Users still only paste a link on the site. Full steps: [`docs/LOCAL_WORKER.md`](docs/LOCAL_WORKER.md).
+
+```bash
+npm run worker          # terminal 1 — needs yt-dlp + ffmpeg
+npm run worker:tunnel   # terminal 2 — prints an https URL
+```
+
+Set Vercel `CLIP_WORKER_URL` to that URL and pause Render.
 
 ## Supabase SQL
 
@@ -50,17 +61,9 @@ In the Supabase dashboard, set **Authentication → URL configuration**:
 
 Use the same host everywhere (`127.0.0.1` vs `localhost`). Mixing them drops the session cookie.
 
-## Render worker
+## Render worker (optional)
 
-The Next.js app stays on Vercel. Export cannot run yt-dlp/ffmpeg there. Deploy `worker/Dockerfile` as a **Render Web Service** (Docker, root directory = repo root, Dockerfile path `worker/Dockerfile`).
-
-1. Create the service from this repo
-2. Set `CLIP_WORKER_SECRET`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LLM_API_KEY` (or `OPENAI_API_KEY`)
-3. On Vercel, set `CLIP_WORKER_URL` to the Render URL (e.g. `https://clipmuse-worker.onrender.com`) and the same `CLIP_WORKER_SECRET`
-
-Free Render instances sleep. The first export after idle can take a minute; Studio polls Library until the mp4 is ready. The worker also drains queued jobs on boot.
-
-The worker also handles Studio transcribe (`POST /transcribe`) when Vercel cannot scrape YouTube captions. Studio does not wait on a single Vercel request for Whisper: analyze yields `pending`, then the browser polls `/api/studio/transcript` for up to 10 minutes. Redeploy Render after pulling this commit.
+Do **not** use Render for YouTube download (bot check). Pause that service while the home worker is on. The Docker worker is still in `worker/Dockerfile` if you later run ffmpeg-only jobs on files already in Storage.
 
 Health check: `GET /health`.
 
