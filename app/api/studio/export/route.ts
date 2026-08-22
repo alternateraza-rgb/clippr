@@ -3,7 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { exportEnabled } from "@/lib/config";
-import type { CaptionLine, CaptionPreset, GameplayTrack } from "@/lib/agent/types";
+import type { CaptionLine, CaptionPreset, ClipCandidate, GameplayTrack } from "@/lib/agent/types";
+import { getSessionUser } from "@/lib/auth/session";
+import { insertClipRender } from "@/lib/supabase/cache";
+import { pingWorker } from "@/lib/worker/client";
+import { workerUrl } from "@/lib/config";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -32,6 +36,13 @@ async function which(bin: string) {
   }
 }
 
+function clampRange(start: number, end: number) {
+  const s = Math.max(0, start);
+  let e = Math.max(s + 8, end);
+  if (e - s > 45) e = s + 45;
+  return { start: s, end: e };
+}
+
 export async function POST(request: Request) {
   const body = (await request.json()) as {
     videoId?: string;
@@ -40,17 +51,51 @@ export async function POST(request: Request) {
     captionLines?: CaptionLine[];
     gameplay?: GameplayTrack;
     captionPreset?: CaptionPreset;
+    candidate?: ClipCandidate;
+    jobId?: string;
   };
+
+  if (!body.videoId || body.start == null || body.end == null) {
+    return Response.json({ message: "Missing composition" }, { status: 400 });
+  }
+
+  const range = clampRange(body.start, body.end);
+  const user = await getSessionUser();
+
+  if (user) {
+    const renderId = await insertClipRender({
+      userId: user.id,
+      videoId: body.videoId,
+      jobId: body.jobId,
+      start: range.start,
+      end: range.end,
+      gameplay: body.gameplay ?? "none",
+      captionPreset: body.captionPreset ?? "hormozi",
+      captionLines: body.captionLines ?? [],
+      moment: body.candidate,
+    });
+    if (renderId) {
+      const ping = await pingWorker(renderId);
+      return Response.json({
+        status: "queued",
+        renderId,
+        worker: ping.ok,
+        message: ping.ok
+          ? "Rendering in the background. Open Library when it is ready."
+          : workerUrl()
+            ? "Queued. The worker is waking up — check Library in a minute."
+            : "Queued. Deploy the Render worker and it will pick this up.",
+      });
+    }
+  }
 
   if (!exportEnabled()) {
     return Response.json({
       status: "preview",
-      message: "Export is off. Set ENABLE_LOCAL_EXPORT=true to render an mp4 locally.",
+      message: user
+        ? "Could not queue a render. Check SUPABASE_SERVICE_ROLE_KEY."
+        : "Sign in to export, or set ENABLE_LOCAL_EXPORT=true for a local mp4.",
     });
-  }
-
-  if (!body.videoId || body.start == null || body.end == null) {
-    return Response.json({ message: "Missing composition" }, { status: 400 });
   }
 
   const hasYtdlp = await which("yt-dlp");
@@ -66,15 +111,14 @@ export async function POST(request: Request) {
   await mkdir(dir, { recursive: true });
   const raw = join(dir, `${body.videoId}-raw.mp4`);
   const out = join(dir, `${body.videoId}-out.mp4`);
-  const start = Math.max(0, body.start);
-  const end = Math.max(start + 1, body.end);
 
   try {
     await run("yt-dlp", [
       "-f",
-      "bv*[height<=1080]+ba/b",
+      "bv*[height<=720]+ba/b",
       "--download-sections",
-      `*${start.toFixed(2)}-${end.toFixed(2)}`,
+      `*${range.start.toFixed(2)}-${range.end.toFixed(2)}`,
+      "--force-keyframes-at-cuts",
       "-o",
       raw,
       "--force-overwrites",
@@ -85,9 +129,11 @@ export async function POST(request: Request) {
       "-i",
       raw,
       "-vf",
-      "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+      "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280",
       "-c:v",
       "libx264",
+      "-preset",
+      "veryfast",
       "-c:a",
       "aac",
       "-movflags",

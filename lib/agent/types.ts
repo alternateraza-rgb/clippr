@@ -16,7 +16,16 @@ export type CaptionPreset = "hormozi" | "clean" | "karaoke";
 export type GameplayTrack = "gta" | "minecraft" | "subway" | "none";
 export type NicheSource = "manual" | "picked";
 export type AgentStage = "resolve" | "transcribe" | "score" | "compose" | "done";
-export type JobStatus = "preview" | "queued" | "saved";
+export type JobStatus =
+  | "preview"
+  | "queued"
+  | "saved"
+  | "downloading"
+  | "transcribing"
+  | "scoring"
+  | "rendering"
+  | "ready"
+  | "failed";
 
 export type WordTiming = {
   start: number;
@@ -74,6 +83,9 @@ export type VideoMeta = {
   publishedAt: string;
   chapters?: { start: number; title: string }[];
   captionsAvailable: boolean;
+  viewCount?: number;
+  channelId?: string;
+  description?: string;
 };
 
 export type DiscoveryItem = {
@@ -85,6 +97,33 @@ export type DiscoveryItem = {
   whyItClips: string;
   estimatedClipCount: number;
   platforms: Platform[];
+  llmRationale?: string;
+};
+
+export type RenderStatus =
+  | "queued"
+  | "downloading"
+  | "transcribing"
+  | "scoring"
+  | "rendering"
+  | "ready"
+  | "failed";
+
+export type ClipRender = {
+  id: string;
+  jobId?: string | null;
+  videoId: string;
+  status: RenderStatus;
+  progress: number;
+  error?: string | null;
+  outputPath?: string | null;
+  downloadUrl?: string | null;
+  durationS?: number | null;
+  startS?: number | null;
+  endS?: number | null;
+  createdAt: string;
+  finishedAt?: string | null;
+  hook?: string;
 };
 
 export type Profile = {

@@ -24,6 +24,18 @@ export function exportEnabled() {
   return env("ENABLE_LOCAL_EXPORT").toLowerCase() === "true";
 }
 
+export function hasServiceRole() {
+  return Boolean(env("SUPABASE_SERVICE_ROLE_KEY") && (env("NEXT_PUBLIC_SUPABASE_URL") || env("SUPABASE_URL")));
+}
+
+export function workerUrl() {
+  return env("CLIP_WORKER_URL").replace(/\/$/, "");
+}
+
+export function workerSecret() {
+  return env("CLIP_WORKER_SECRET");
+}
+
 export function llmProvider() {
   return (env("LLM_PROVIDER") || "openai").toLowerCase();
 }

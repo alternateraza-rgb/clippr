@@ -27,6 +27,7 @@ export function OnboardingFlow() {
   const [source, setSource] = useState<"manual" | "picked">(profile.nicheSource);
   const [picking, setPicking] = useState(false);
   const [picked, setPicked] = useState<ReturnType<typeof pickForMe> | null>(null);
+  const [finishing, setFinishing] = useState(false);
 
   function toggle<T>(list: T[], value: T) {
     return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -44,14 +45,25 @@ export function OnboardingFlow() {
   }
 
   async function finish() {
-    await setProfile({
+    setFinishing(true);
+    const next = {
       ...profile,
-      platforms: platforms.length ? platforms : ["youtube"],
+      platforms: platforms.length ? platforms : (["youtube"] as Platform[]),
       niche,
       interests: interests.length ? interests : ["storytelling"],
       nicheSource: source,
       onboardingComplete: true,
-    });
+    };
+    await setProfile(next);
+    await fetch("/api/discovery/bootstrap", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        niche: next.niche,
+        interests: next.interests,
+        platforms: next.platforms,
+      }),
+    }).catch(() => null);
     router.push("/app");
     router.refresh();
   }
@@ -201,7 +213,9 @@ export function OnboardingFlow() {
           {step < 3 ? (
             <Pill onClick={() => setStep((s) => s + 1)}>Continue</Pill>
           ) : (
-            <Pill onClick={finish}>Open the studio</Pill>
+            <Pill onClick={finish} disabled={finishing}>
+              {finishing ? "Stocking your desk…" : "Open the studio"}
+            </Pill>
           )}
         </div>
       </div>

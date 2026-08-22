@@ -43,6 +43,7 @@ function StudioInner() {
   const [preset, setPreset] = useState<CaptionPreset>(profile.captionPreset);
   const [saved, setSaved] = useState(false);
   const [exportMsg, setExportMsg] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const videoId = parseYouTubeId(raw);
 
@@ -161,34 +162,87 @@ function StudioInner() {
     setSaved(true);
   }
 
-  async function exportClip() {
-    if (!analysis || !selected) return;
-    const res = await fetch("/api/studio/export", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        videoId: analysis.video.videoId,
-        start: selected.start,
-        end: selected.end,
-        captionLines: selected.captionLines,
-        gameplay,
-        captionPreset: preset,
-      }),
-    });
-    const type = res.headers.get("content-type") ?? "";
-    if (type.includes("video/") || type.includes("octet-stream")) {
-      const blob = await res.blob();
-      const href = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = href;
-      a.download = `clipmuse-${analysis.video.videoId}.mp4`;
-      a.click();
-      URL.revokeObjectURL(href);
-      setExportMsg("Downloaded.");
-      return;
+  async function pollRender(renderId: string) {
+    const deadline = Date.now() + 8 * 60_000;
+    while (Date.now() < deadline) {
+      const res = await fetch(`/api/studio/renders/${renderId}`);
+      const data = (await res.json()) as {
+        render?: {
+          status: string;
+          progress: number;
+          error?: string | null;
+          downloadUrl?: string | null;
+        };
+      };
+      const render = data.render;
+      if (!render) break;
+      if (render.status === "ready" && render.downloadUrl) {
+        const file = await fetch(render.downloadUrl);
+        const blob = await file.blob();
+        const href = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = href;
+        a.download = `clipmuse-${analysis?.video.videoId ?? "clip"}.mp4`;
+        a.click();
+        URL.revokeObjectURL(href);
+        setExportMsg("Downloaded.");
+        return;
+      }
+      if (render.status === "failed") {
+        setExportMsg(render.error || "Render failed.");
+        return;
+      }
+      setExportMsg(`${render.status}${render.progress ? ` · ${render.progress}%` : ""}`);
+      await new Promise((r) => setTimeout(r, 3000));
     }
-    const payload = (await res.json().catch(() => ({}))) as { message?: string };
-    setExportMsg(payload.message ?? "Export is preview-only on this machine.");
+    setExportMsg("Still rendering. Check Library in a minute.");
+  }
+
+  async function exportClip() {
+    if (!analysis || !selected || exporting) return;
+    setExporting(true);
+    setExportMsg("Queuing the render…");
+    try {
+      const res = await fetch("/api/studio/export", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          videoId: analysis.video.videoId,
+          start: selected.start,
+          end: selected.end,
+          captionLines: selected.captionLines,
+          gameplay,
+          captionPreset: preset,
+          candidate: selected,
+        }),
+      });
+      const type = res.headers.get("content-type") ?? "";
+      if (type.includes("video/") || type.includes("octet-stream")) {
+        const blob = await res.blob();
+        const href = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = href;
+        a.download = `clipmuse-${analysis.video.videoId}.mp4`;
+        a.click();
+        URL.revokeObjectURL(href);
+        setExportMsg("Downloaded.");
+        return;
+      }
+      const payload = (await res.json().catch(() => ({}))) as {
+        message?: string;
+        renderId?: string;
+        status?: string;
+      };
+      if (payload.renderId) {
+        await pollRender(payload.renderId);
+        return;
+      }
+      setExportMsg(payload.message ?? "Export is preview-only on this machine.");
+    } catch (err) {
+      setExportMsg(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -292,12 +346,12 @@ function StudioInner() {
                 <Pill onClick={saveClip} className="w-full">
                   {saved ? "Saved to library" : "Save clip"}
                 </Pill>
-                <Pill variant="ghost" className="w-full" onClick={exportClip}>
-                  Export
+                <Pill variant="ghost" className="w-full" onClick={exportClip} disabled={exporting}>
+                  {exporting ? "Rendering…" : "Export"}
                 </Pill>
               </div>
               <p className="mt-3 text-[12px] text-muted">
-                {exportMsg || "Export is off unless ENABLE_LOCAL_EXPORT=true."}
+                {exportMsg || "Export burns captions into a 9:16 mp4 on the worker."}
               </p>
             </div>
           </div>
