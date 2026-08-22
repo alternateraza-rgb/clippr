@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
-import { env, workerSecret } from "../../lib/config";
+import "../../lib/load-env";
+import { env, hasApify, hasLlm, hasServiceRole, hasSupadata, workerSecret } from "../../lib/config";
 import { upsertTranscribeJob } from "../../lib/supabase/jobs";
 import { drainQueued, processRender } from "./render";
 import { processTranscribe } from "./transcribe";
@@ -154,7 +155,11 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
+  const secret = Boolean(workerSecret());
   console.info(`[worker] listening on ${HOST}:${PORT}`);
+  console.info(
+    `[worker] secret=${secret ? "set" : "MISSING"} supabase=${hasServiceRole() ? "set" : "MISSING"} llm=${hasLlm() ? "set" : "MISSING"} supadata=${hasSupadata() ? "set" : "no"} apify=${hasApify() ? "set" : "no"}`,
+  );
   drainQueued()
     .then((ids) => ids.forEach(enqueue))
     .catch((error) => console.error("[worker] drain failed", error));

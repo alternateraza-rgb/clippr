@@ -6,6 +6,8 @@ import {
   hasYouTubeKey,
   isDemoMode,
   workerUrl,
+  hasSupadata,
+  hasApify,
 } from "@/lib/config";
 
 export async function GET() {
@@ -18,5 +20,7 @@ export async function GET() {
     llm: hasLlm(),
     youtube: hasYouTubeKey(),
     worker: Boolean(workerUrl()),
+    ingest: hasSupadata(),
+    download: hasApify(),
   });
 }

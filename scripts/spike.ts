@@ -2,27 +2,10 @@
  * Prove the clipping pipeline on real YouTube videos.
  * Usage: npx tsx scripts/spike.ts [videoId ...]
  */
-import { readFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
+import "../lib/load-env";
 import { scoreTranscript } from "../lib/agent/score";
 import { fetchTranscript } from "../lib/agent/transcript";
 import { hydrateVideo } from "../lib/youtube/meta";
-
-function loadEnv() {
-  const file = resolve(process.cwd(), ".env.local");
-  if (!existsSync(file)) return;
-  for (const line of readFileSync(file, "utf8").split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq < 0) continue;
-    const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).trim().replace(/^['"]|['"]$/g, "");
-    if (!process.env[key]) process.env[key] = value;
-  }
-}
-
-loadEnv();
 
 const DEFAULTS = [
   "UF8uR6Z6KLc", // speech
