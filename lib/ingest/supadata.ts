@@ -15,12 +15,18 @@ function youtubeUrl(videoId: string) {
   return `https://www.youtube.com/watch?v=${videoId}`;
 }
 
+function chunkToSeconds(offset: number, duration: number) {
+  if (duration > 120 || offset > 20_000) {
+    return { start: offset / 1000, dur: Math.max(duration / 1000, 0.2) };
+  }
+  return { start: offset, dur: Math.max(duration, 0.2) };
+}
+
 function fromChunks(chunks: Chunk[], language: string, generated: boolean): TranscriptResult | null {
   const segments: TranscriptSegment[] = chunks
     .map((c) => {
-      const start = (Number(c.offset) || 0) / 1000;
-      const dur = (Number(c.duration) || 0) / 1000;
-      return { start, end: start + Math.max(dur, 0.2), text: (c.text || "").trim() };
+      const { start, dur } = chunkToSeconds(Number(c.offset) || 0, Number(c.duration) || 0);
+      return { start, end: start + dur, text: (c.text || "").trim() };
     })
     .filter((s) => s.text);
   const words = explodeWords(segments);

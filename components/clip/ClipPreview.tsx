@@ -24,6 +24,7 @@ type YtPlayer = {
   playVideo: () => void;
   unMute?: () => void;
   setVolume?: (n: number) => void;
+  loadVideoById?: (opts: { videoId: string; startSeconds: number; endSeconds: number }) => void;
   destroy: () => void;
 };
 
@@ -41,7 +42,7 @@ declare global {
           };
         },
       ) => YtPlayer;
-      PlayerState?: { ENDED: number; PLAYING: number };
+      PlayerState?: { UNSTARTED: number; ENDED: number; PLAYING: number; PAUSED: number; CUED: number };
     };
     onYouTubeIframeAPIReady?: () => void;
   }
@@ -70,13 +71,18 @@ function loadApi() {
   });
 }
 
-function armPlayer(player: YtPlayer, start: number, withAudio: boolean) {
+function jumpToClip(player: YtPlayer, videoId: string, start: number, duration: number, withAudio: boolean) {
   if (withAudio) {
     player.unMute?.();
     player.setVolume?.(100);
   }
-  player.seekTo(start, true);
-  player.playVideo();
+  const end = Math.max(start + 1, start + duration);
+  if (player.loadVideoById) {
+    player.loadVideoById({ videoId, startSeconds: start, endSeconds: end });
+  } else {
+    player.seekTo(start, true);
+    player.playVideo();
+  }
 }
 
 export function ClipPreview({
@@ -91,55 +97,84 @@ export function ClipPreview({
 }: ClipPreviewProps) {
   const mount = useRef<HTMLDivElement>(null);
   const player = useRef<YtPlayer | null>(null);
+  const startRef = useRef(start);
+  const durationRef = useRef(duration);
+  const seeks = useRef(0);
   const [playing, setPlaying] = useState(autoPlay);
   const [time, setTime] = useState(0);
+  const [synced, setSynced] = useState(false);
   const split = gameplay !== "none";
   const withAudio = !autoPlay;
+  startRef.current = start;
+  durationRef.current = duration;
 
   useEffect(() => {
     if (!playing || !mount.current) return;
     let cancelled = false;
     let raf = 0;
     const host = mount.current;
-    if (!host) return;
     const el = document.createElement("div");
     el.className = "h-full w-full";
     host.appendChild(el);
     loadApi().then(() => {
       if (cancelled || !window.YT?.Player) return;
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
       player.current = new window.YT.Player(el, {
         videoId,
         playerVars: {
+          start: Math.max(0, Math.floor(startRef.current)),
+          end: Math.max(1, Math.ceil(startRef.current + durationRef.current)),
           autoplay: 1,
           mute: withAudio ? 0 : 1,
           controls: 0,
           modestbranding: 1,
           rel: 0,
           playsinline: 1,
+          enablejsapi: 1,
+          ...(origin.startsWith("http") ? { origin } : {}),
         },
         events: {
-          onReady: (e) => armPlayer(e.target, start, withAudio),
+          onReady: (e) => {
+            seeks.current = 0;
+            jumpToClip(e.target, videoId, startRef.current, durationRef.current, withAudio);
+          },
           onStateChange: (e) => {
-            if (e.data === window.YT?.PlayerState?.ENDED) {
-              armPlayer(e.target, start, withAudio);
+            const targetStart = startRef.current;
+            const span = durationRef.current;
+            const now = e.target.getCurrentTime?.() ?? 0;
+            const playingState = window.YT?.PlayerState?.PLAYING;
+            const endedState = window.YT?.PlayerState?.ENDED;
+            const cuedState = window.YT?.PlayerState?.CUED;
+            if (e.data === endedState) {
+              jumpToClip(e.target, videoId, targetStart, span, withAudio);
+              return;
             }
-            if (e.data === window.YT?.PlayerState?.PLAYING && withAudio) {
+            if ((e.data === playingState || e.data === cuedState) && withAudio) {
               e.target.unMute?.();
               e.target.setVolume?.(100);
+            }
+            if (e.data === playingState && now < targetStart - 1 && seeks.current < 6) {
+              seeks.current += 1;
+              e.target.seekTo(targetStart, true);
             }
           },
         },
       });
       const tick = () => {
-        const current = player.current?.getCurrentTime?.() ?? start;
-        const span = Math.max(duration, 0.1);
-        const rel = current - start;
-        if (rel < -0.15) {
+        const target = startRef.current;
+        const span = Math.max(durationRef.current, 0.1);
+        const current = player.current?.getCurrentTime?.() ?? target;
+        const rel = current - target;
+        if (rel < -1.1) {
+          setSynced(false);
+          if (seeks.current < 6) {
+            seeks.current += 1;
+            player.current?.seekTo(target, true);
+          }
           setTime(0);
-        } else if (rel >= span) {
-          setTime(span);
         } else {
-          setTime(Math.max(0, rel));
+          setSynced(true);
+          setTime(Math.max(0, Math.min(span, rel)));
         }
         raf = window.requestAnimationFrame(tick);
       };
@@ -152,7 +187,15 @@ export function ClipPreview({
       player.current = null;
       el.remove();
     };
-  }, [playing, videoId, start, duration, withAudio]);
+  }, [playing, videoId, withAudio]);
+
+  useEffect(() => {
+    if (!playing || !player.current) return;
+    seeks.current = 0;
+    setSynced(false);
+    setTime(0);
+    jumpToClip(player.current, videoId, start, duration, withAudio);
+  }, [start, duration, playing, videoId, withAudio]);
 
   return (
     <div
@@ -172,7 +215,12 @@ export function ClipPreview({
           <GameplayPane track={gameplay} />
         </div>
       ) : null}
-      <CaptionTrack lines={captionLines} time={time} preset={preset} animate={playing} />
+      <CaptionTrack
+        lines={!playing || synced ? captionLines : []}
+        time={playing ? time : 0}
+        preset={preset}
+        animate={playing && synced}
+      />
       {!playing ? (
         <button
           type="button"

@@ -1,6 +1,7 @@
 import { captionLinesForRange } from "@/lib/agent/compose";
 import { heuristicCandidates } from "@/lib/agent/heuristic";
 import { RUBRIC } from "@/lib/agent/rubric";
+import { snapRange } from "@/lib/agent/snap";
 import { pickOffset } from "@/lib/agent/time";
 import { timedScript, type TranscriptResult } from "@/lib/agent/transcript";
 import { hasLlm } from "@/lib/config";
@@ -37,11 +38,13 @@ function asRows(parsed: unknown): Array<Record<string, unknown>> {
 function toCandidates(raw: unknown, words: WordTiming[]): ClipCandidate[] {
   return asRows(raw)
     .map((c, i) => {
-      const start = pickOffset(c, ["start", "start_s", "startSec", "startTime", "from", "t0"]);
-      const end = pickOffset(c, ["end", "end_s", "endSec", "endTime", "to", "t1"]);
-      if (start == null || end == null) return null;
-      const finish = Math.max(start + 8, end);
-      if (finish - start < 8) return null;
+      const startRaw = pickOffset(c, ["start", "start_s", "startSec", "startTime", "from", "t0"]);
+      const endRaw = pickOffset(c, ["end", "end_s", "endSec", "endTime", "to", "t1"]);
+      if (startRaw == null || endRaw == null) return null;
+      const hook = String(c.hook || c.title || "").slice(0, 220);
+      const snapped = snapRange(startRaw, Math.max(startRaw + 8, endRaw), hook, words);
+      const start = snapped.start;
+      const finish = snapped.end;
       const nested = (c.scores && typeof c.scores === "object" ? c.scores : c) as Record<string, unknown>;
       const scores: ScoreBreakdown = {
         hook: clampScore(nested.hook),
@@ -54,7 +57,7 @@ function toCandidates(raw: unknown, words: WordTiming[]): ClipCandidate[] {
         id: `c-${i + 1}`,
         start: Math.max(0, start),
         end: finish,
-        hook: String(c.hook || c.title || "").slice(0, 220),
+        hook,
         whyItClips: String(c.whyItClips || c.why_it_clips || c.reason || "").slice(0, 400),
         score: weightedScore(scores),
         scores,

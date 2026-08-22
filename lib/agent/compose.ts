@@ -1,4 +1,3 @@
-import { linesFromWords } from "@/lib/fixtures/captions";
 import type { CaptionLine, WordTiming } from "@/lib/agent/types";
 
 export function captionLinesForRange(
@@ -13,5 +12,22 @@ export function captionLinesForRange(
       start: Math.max(0, w.start - start),
       end: Math.max(0.05, w.end - start),
     }));
-  return linesFromWords(slice, 3);
+  const lines: CaptionLine[] = [];
+  let buf: WordTiming[] = [];
+  const flush = () => {
+    if (!buf.length) return;
+    lines.push({
+      start: buf[0].start,
+      end: Math.max(buf[buf.length - 1].end, buf[0].start + 0.12),
+      words: buf,
+    });
+    buf = [];
+  };
+  for (const word of slice) {
+    buf.push(word);
+    const span = buf[buf.length - 1].end - buf[0].start;
+    if (buf.length >= 3 || span >= 1.05) flush();
+  }
+  flush();
+  return lines;
 }

@@ -2,7 +2,16 @@
 
 import { cn } from "@/lib/cn";
 import { groupExit, isKeyword, wordMotion } from "@/lib/captions/motion";
-import type { CaptionLine, CaptionPreset } from "@/lib/agent/types";
+import type { CaptionLine, CaptionPreset, WordTiming } from "@/lib/agent/types";
+
+function evenCue(words: WordTiming[]) {
+  if (words.length < 2) return false;
+  const gaps = [];
+  for (let i = 1; i < words.length; i++) gaps.push(words[i].start - words[i - 1].start);
+  const avg = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+  if (avg < 0.08) return true;
+  return gaps.filter((g) => Math.abs(g - avg) < 0.04).length / gaps.length > 0.8;
+}
 
 export function CaptionTrack({
   lines,
@@ -21,6 +30,7 @@ export function CaptionTrack({
   if (!line || line.words.length === 0) return null;
 
   const exit = animate ? groupExit(time, line.end) : { opacity: 1, scale: 1 };
+  const lockstep = evenCue(line.words);
   const goldIndex = line.words.findIndex((w) => isKeyword(w));
 
   return (
@@ -42,8 +52,10 @@ export function CaptionTrack({
       }}
     >
       {line.words.map((word, i) => {
-        const started = !animate || time + 0.02 >= word.start;
-        const localMs = animate ? (time - word.start) * 1000 : 800;
+        const cueLocal = (time - line.start) * 1000 - i * 48;
+        const wordLocal = (time - word.start) * 1000;
+        const started = !animate || time + 0.02 >= (lockstep ? line.start + i * 0.048 : word.start);
+        const localMs = animate ? (lockstep ? cueLocal : wordLocal) : 800;
         const motion = wordMotion(localMs, word, i, {
           preset,
           stayGold: preset === "hormozi" && i === goldIndex && started,
