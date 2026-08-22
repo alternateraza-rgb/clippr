@@ -40,6 +40,7 @@ Paste these in the SQL editor (safe to re-run), in order:
 1. [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql)
 2. [`supabase/migrations/002_renders.sql`](supabase/migrations/002_renders.sql)
 3. [`supabase/migrations/003_gameplay.sql`](supabase/migrations/003_gameplay.sql) — public `gameplay` bucket. Upload `minecraft.mp4`, `gta.mp4`, `subway.mp4` (your own / licensed loops).
+4. [`supabase/migrations/004_transcribe_jobs.sql`](supabase/migrations/004_transcribe_jobs.sql) — worker job status + deletes poison `none` / fake-52 cache rows.
 
 In the Supabase dashboard, set **Authentication → URL configuration**:
 
@@ -59,7 +60,7 @@ The Next.js app stays on Vercel. Export cannot run yt-dlp/ffmpeg there. Deploy `
 
 Free Render instances sleep. The first export after idle can take a minute; Studio polls Library until the mp4 is ready. The worker also drains queued jobs on boot.
 
-The worker also handles Studio transcribe (`POST /transcribe`) when Vercel cannot scrape YouTube captions. Redeploy Render after pulling this commit.
+The worker also handles Studio transcribe (`POST /transcribe`) when Vercel cannot scrape YouTube captions. Studio does not wait on a single Vercel request for Whisper: analyze yields `pending`, then the browser polls `/api/studio/transcript` for up to 10 minutes. Redeploy Render after pulling this commit.
 
 Health check: `GET /health`.
 

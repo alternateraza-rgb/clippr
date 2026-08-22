@@ -6,7 +6,7 @@ import { exportEnabled } from "@/lib/config";
 import type { CaptionLine, CaptionPreset, ClipCandidate, GameplayTrack } from "@/lib/agent/types";
 import { getSessionUser } from "@/lib/auth/session";
 import { insertClipRender } from "@/lib/supabase/cache";
-import { pingWorker } from "@/lib/worker/client";
+import { pingWorker, wakeWorker } from "@/lib/worker/client";
 import { workerUrl } from "@/lib/config";
 
 export const runtime = "nodejs";
@@ -75,7 +75,8 @@ export async function POST(request: Request) {
       moment: body.candidate,
     });
     if (renderId) {
-      const ping = await pingWorker(renderId);
+      await wakeWorker();
+      const ping = await pingWorker(renderId, 90_000);
       return Response.json({
         status: "queued",
         renderId,

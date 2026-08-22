@@ -20,13 +20,14 @@ import { hydrateVideo } from "@/lib/youtube/meta";
 export type StreamPacket =
   | { type: "event"; stage: AgentStage; message: string; at: number }
   | { type: "result"; analysis: AnalysisResult }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "pending"; message: string };
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function waitForTranscript(videoId: string, tries = 24) {
+async function waitForTranscript(videoId: string, tries = 4) {
   for (let i = 0; i < tries; i++) {
     const hit = await readTranscriptCache(videoId);
     if (hit?.words.length) return hit;
@@ -95,26 +96,33 @@ export async function* runAnalysis(
 
     if (!transcript?.words.length && workerUrl()) {
       yield emit("transcribe", "No captions on Vercel — sending audio to the worker…");
-      const ping = await requestTranscribe(videoId);
-      if (!ping.ok) {
+      const ping = await requestTranscribe(videoId, 20_000);
+      if (ping.ok) {
+        yield emit("transcribe", "Waiting on Whisper / auto-captions (Render may be waking up)…");
+        transcript = await waitForTranscript(videoId);
+      } else if (ping.reason === "not_configured") {
         yield {
           type: "error",
-          message:
-            ping.reason === "not_configured"
-              ? "Set CLIP_WORKER_URL so we can transcribe when YouTube blocks captions."
-              : `Worker did not accept transcribe (${ping.reason}).`,
+          message: "Set CLIP_WORKER_URL and CLIP_WORKER_SECRET so we can transcribe when YouTube blocks captions.",
         };
         return;
+      } else {
+        yield emit("transcribe", "Worker is waking up — Studio will keep polling…");
       }
-      yield emit("transcribe", "Waiting on Whisper / auto-captions (Render may be waking up)…");
-      transcript = await waitForTranscript(videoId);
     }
 
     if (!transcript?.words.length) {
+      if (!workerUrl()) {
+        yield {
+          type: "error",
+          message: "Could not get captions, and CLIP_WORKER_URL is not set.",
+        };
+        return;
+      }
+      yield emit("transcribe", "Still transcribing on Render. Studio will wait for Whisper…");
       yield {
-        type: "error",
-        message:
-          "Could not get a transcript. The worker downloads captions or Whisper on the first 10 minutes — check Render logs and CLIP_WORKER_URL.",
+        type: "pending",
+        message: "Worker is transcribing the first 10 minutes. This can take a few minutes after Render wakes.",
       };
       return;
     }

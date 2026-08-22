@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { env, workerSecret } from "../../lib/config";
+import { upsertTranscribeJob } from "../../lib/supabase/jobs";
 import { drainQueued, processRender } from "./render";
 import { processTranscribe } from "./transcribe";
 
@@ -18,6 +19,7 @@ function enqueueTranscribe(id: string) {
   if (!id) return;
   if (transcribeQueue.includes(id) || transcribeSeen.has(id)) return;
   transcribeQueue.push(id);
+  void upsertTranscribeJob({ videoId: id, status: "queued" });
   void pumpTranscribe();
 }
 

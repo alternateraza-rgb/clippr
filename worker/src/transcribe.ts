@@ -2,6 +2,7 @@ import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAdminClient } from "../../lib/supabase/admin";
+import { upsertTranscribeJob } from "../../lib/supabase/jobs";
 import type { TranscriptResult } from "../../lib/agent/transcript";
 import { run } from "./exec";
 import { explodeWords, parseVtt, segmentsFromWords } from "./vtt";
@@ -89,13 +90,27 @@ async function whisperWindow(dir: string, videoId: string): Promise<TranscriptRe
 
 export async function processTranscribe(videoId: string) {
   if (!videoId) throw new Error("missing videoId");
+  await upsertTranscribeJob({ videoId, status: "running" });
   const dir = join(tmpdir(), "clipmuse-transcribe", videoId);
   await mkdir(dir, { recursive: true });
   try {
     const fromSubs = await trySubs(dir, videoId);
     const transcript = fromSubs ?? (await whisperWindow(dir, videoId));
     await writeCache(videoId, transcript);
+    await upsertTranscribeJob({
+      videoId,
+      status: "ready",
+      source: transcript.source === "whisper" ? "whisper" : "captions",
+      wordCount: transcript.words.length,
+    });
     return { ok: true, source: transcript.source, words: transcript.words.length };
+  } catch (error) {
+    await upsertTranscribeJob({
+      videoId,
+      status: "failed",
+      error: error instanceof Error ? error.message.slice(0, 500) : "Transcribe failed",
+    });
+    throw error;
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => null);
   }

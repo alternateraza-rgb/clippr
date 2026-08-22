@@ -37,7 +37,7 @@ export function CaptionTrack({
           <span
             key={`${word.start}-${i}`}
             className={cn(
-              "inline-block origin-bottom transition-transform duration-150",
+              "inline-block origin-bottom transition-[transform,opacity,background-color,color] duration-200 ease-[cubic-bezier(0.2,1.6,0.3,1)]",
               preset === "hormozi" &&
                 "rounded-[8px] bg-ink px-2 py-1 text-white shadow-[0_2px_0_#0c0a09]",
               preset === "hormozi" && popped && "scale-100",

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Chip } from "@/components/ui/Chip";
 import { Pill } from "@/components/ui/Pill";
 import { signOut } from "@/app/auth/actions";
@@ -15,6 +16,20 @@ const PLATFORMS: { id: Platform; label: string }[] = [
 
 export default function SettingsPage() {
   const { profile, setProfile, reset } = useProfile();
+  const [connections, setConnections] = useState<{
+    llm?: boolean;
+    youtube?: boolean;
+    worker?: boolean;
+    liveFeed?: boolean;
+    authEnabled?: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then(setConnections)
+      .catch(() => null);
+  }, []);
 
   function togglePlatform(id: Platform) {
     const next = profile.platforms.includes(id)
@@ -30,6 +45,35 @@ export default function SettingsPage() {
       <p className="mt-2 text-body">
         These preferences steer Home, Ideas, and the default Studio setup.
       </p>
+
+      {connections ? (
+        <section className="mt-10 rounded-[12px] bg-surface p-5 shadow-hairline">
+          <p className="text-[13px] font-medium text-muted">Connections</p>
+          <ul className="mt-3 space-y-2 text-[14px] text-body">
+            <li>{connections.authEnabled ? "Supabase auth is on." : "Supabase keys missing."}</li>
+            <li>
+              {connections.llm
+                ? "OpenAI brain is on (LLM_API_KEY or OPENAI_API_KEY)."
+                : "Set LLM_API_KEY or OPENAI_API_KEY."}
+            </li>
+            <li>
+              {connections.youtube
+                ? "YouTube Data API is on."
+                : "Set YOUTUBE_API_KEY for a live Ideas feed."}
+            </li>
+            <li>
+              {connections.worker
+                ? "Render worker URL is set."
+                : "Set CLIP_WORKER_URL + CLIP_WORKER_SECRET (same secret on Render)."}
+            </li>
+            <li>
+              {connections.liveFeed
+                ? "Home can stock a live niche feed."
+                : "Live feed needs YouTube + service role."}
+            </li>
+          </ul>
+        </section>
+      ) : null}
 
       <section className="mt-10">
         <p className="text-[13px] font-medium text-muted">Name</p>
