@@ -16,9 +16,9 @@ function ts(seconds: number) {
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
-  const whole = Math.floor(sec);
-  const cs = Math.round((sec - whole) * 100);
-  return `${h}:${String(m).padStart(2, "0")}:${String(whole).padStart(2, "0")}.${String(cs).padStart(2, "0")}`;
+  const wholeSec = Math.floor(sec);
+  const cs2 = Math.round((sec - wholeSec) * 100);
+  return `${h}:${String(m).padStart(2, "0")}:${String(wholeSec).padStart(2, "0")}.${String(cs2).padStart(2, "0")}`;
 }
 
 function style(preset: CaptionPreset) {
@@ -28,7 +28,7 @@ function style(preset: CaptionPreset) {
   if (preset === "karaoke") {
     return "Style: Default,Liberation Sans,62,&H00FFFFFF,&H0000E5FF,&H00000000,&HA0000000,-1,0,0,0,100,100,0,0,1,4,2,2,40,40,160,1";
   }
-  return "Style: Default,Liberation Sans,68,&H0000FFFF,&H00FFFFFF,&H00000000,&HB0000000,-1,0,0,0,100,100,0,0,1,5,0,2,40,40,180,1";
+  return "Style: Default,Liberation Sans,60,&H00FFFFFF,&H0000FFFF,&H00000000,&HE6000000,-1,0,0,0,100,100,0,0,3,12,0,5,40,40,0,1";
 }
 
 function karaokeLine(line: CaptionLine) {
@@ -40,6 +40,14 @@ function karaokeLine(line: CaptionLine) {
       return `${gap}{\\k${dur}}${assEscape(word.text)}`;
     })
     .join(" ");
+}
+
+function hormoziEvents(line: CaptionLine) {
+  const pop = "{\\fscx60\\fscy60\\t(0,90,\\fscx112\\fscy112)\\t(90,150,\\fscx100\\fscy100)}";
+  const fill = karaokeLine(line);
+  const start = ts(line.start);
+  const end = ts(Math.max(line.end, line.start + 0.2));
+  return `Dialogue: 0,${start},${end},Default,,0,0,0,,${pop}${fill}`;
 }
 
 export function buildAss(lines: CaptionLine[], preset: CaptionPreset) {
@@ -61,6 +69,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
   const events = lines
     .filter((line) => line.words.length)
     .map((line) => {
+      if (preset === "hormozi") return hormoziEvents(line);
       const start = ts(line.start);
       const end = ts(Math.max(line.end, line.start + 0.2));
       const text =

@@ -44,8 +44,119 @@ function StudioInner() {
   const [saved, setSaved] = useState(false);
   const [exportMsg, setExportMsg] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [connections, setConnections] = useState<{ worker: boolean; llm: boolean } | null>(null);
 
   const videoId = parseYouTubeId(raw);
+
+  function patchTranscribe(message: string) {
+    setEvents((prev) => {
+      const next = [...prev];
+      const idx = [...next].map((e) => e.stage).lastIndexOf("transcribe");
+      const event: AgentEvent = { stage: "transcribe", message, at: next[idx]?.at ?? Date.now() };
+      if (idx >= 0) next[idx] = event;
+      else next.push(event);
+      return next;
+    });
+  }
+
+  async function consumeAnalyze(id: string, controller: AbortController): Promise<"result" | "pending"> {
+    const res = await fetch("/api/studio/analyze", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ videoId: id, niche: profile.niche }),
+      signal: controller.signal,
+    });
+    if (!res.ok || !res.body) {
+      const payload = await res.json().catch(() => ({}));
+      throw new Error((payload as { message?: string }).message || "Could not analyze that video.");
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let pending = false;
+    let gotResult = false;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const chunks = buffer.split("\n\n");
+      buffer = chunks.pop() ?? "";
+      for (const chunk of chunks) {
+        const line = chunk.split("\n").find((l) => l.startsWith("data: "));
+        if (!line) continue;
+        const packet = JSON.parse(line.slice(6)) as {
+          type: string;
+          stage?: AgentEvent["stage"];
+          message?: string;
+          at?: number;
+          analysis?: AnalysisResult;
+        };
+        if (packet.type === "event" && packet.stage && packet.message) {
+          setEvents((prev) => [
+            ...prev,
+            { stage: packet.stage!, message: packet.message!, at: packet.at ?? 0 },
+          ]);
+        }
+        if (packet.type === "error") {
+          throw new Error(packet.message || "Analysis failed");
+        }
+        if (packet.type === "pending") {
+          pending = true;
+          if (packet.message) patchTranscribe(packet.message);
+        }
+        if (packet.type === "result" && packet.analysis) {
+          gotResult = true;
+          setAnalysis(packet.analysis);
+          setSelected(packet.analysis.candidates[0] ?? null);
+          setPhase("results");
+        }
+      }
+    }
+    if (gotResult) return "result";
+    if (pending) return "pending";
+    throw new Error("Analysis ended without a result.");
+  }
+
+  async function waitForWorkerTranscript(id: string, controller: AbortController) {
+    await fetch("/api/studio/transcript", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ videoId: id }),
+      signal: controller.signal,
+    }).catch(() => null);
+    const deadline = Date.now() + 10 * 60_000;
+    while (Date.now() < deadline) {
+      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+      const res = await fetch(`/api/studio/transcript?videoId=${encodeURIComponent(id)}`, {
+        signal: controller.signal,
+      });
+      const data = (await res.json()) as {
+        ready?: boolean;
+        status?: string;
+        source?: string | null;
+        words?: number;
+        error?: string | null;
+      };
+      if (data.ready) {
+        patchTranscribe(
+          `${(data.words ?? 0).toLocaleString()} words ready · ${data.source ?? "worker"}`,
+        );
+        return;
+      }
+      if (data.status === "failed") {
+        throw new Error(data.error || "Worker transcribe failed. Check Render logs.");
+      }
+      const label =
+        data.status === "running"
+          ? "Worker is downloading audio / running Whisper…"
+          : data.status === "queued"
+            ? "Queued on Render (instance may be waking)…"
+            : "Waiting for a transcript…";
+      patchTranscribe(label);
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    throw new Error("Transcript timed out. Check CLIP_WORKER_URL and Render logs.");
+  }
 
   async function start(id: string) {
     abort.current?.abort();
@@ -60,50 +171,10 @@ function StudioInner() {
     setError("");
 
     try {
-      const res = await fetch("/api/studio/analyze", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ videoId: id, niche: profile.niche }),
-        signal: controller.signal,
-      });
-      if (!res.ok || !res.body) {
-        const payload = await res.json().catch(() => ({}));
-        throw new Error(payload.message || "Could not analyze that video.");
-      }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const chunks = buffer.split("\n\n");
-        buffer = chunks.pop() ?? "";
-        for (const chunk of chunks) {
-          const line = chunk.split("\n").find((l) => l.startsWith("data: "));
-          if (!line) continue;
-          const packet = JSON.parse(line.slice(6)) as {
-            type: string;
-            stage?: AgentEvent["stage"];
-            message?: string;
-            at?: number;
-            analysis?: AnalysisResult;
-          };
-          if (packet.type === "event" && packet.stage && packet.message) {
-            setEvents((prev) => [
-              ...prev,
-              { stage: packet.stage!, message: packet.message!, at: packet.at ?? 0 },
-            ]);
-          }
-          if (packet.type === "error") {
-            throw new Error(packet.message || "Analysis failed");
-          }
-          if (packet.type === "result" && packet.analysis) {
-            setAnalysis(packet.analysis);
-            setSelected(packet.analysis.candidates[0] ?? null);
-            setPhase("results");
-          }
-        }
+      const first = await consumeAnalyze(id, controller);
+      if (first === "pending") {
+        await waitForWorkerTranscript(id, controller);
+        await consumeAnalyze(id, controller);
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
@@ -129,7 +200,16 @@ function StudioInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialId]);
 
-  const noCaptions = analysis && !analysis.video.captionsAvailable;
+  useEffect(() => {
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((d: { worker?: boolean; llm?: boolean }) => {
+        setConnections({ worker: Boolean(d.worker), llm: Boolean(d.llm) });
+      })
+      .catch(() => null);
+  }, []);
+
+  const noCaptions = Boolean(analysis && selected && selected.captionLines.length === 0);
 
   const duration = useMemo(() => {
     if (!selected) return 12;
@@ -259,7 +339,7 @@ function StudioInner() {
               setError("");
             }}
             onSubmit={submit}
-            placeholder="Paste a YouTube link"
+            placeholder="Paste a long YouTube link (8+ min)"
           />
           {error ? <p className="mt-3 text-[13px] text-brand">{error}</p> : null}
           {noCaptions && phase !== "idle" ? (
@@ -286,8 +366,19 @@ function StudioInner() {
 
         {phase === "idle" ? (
           <p className="mt-16 max-w-[40ch] text-body">
-            Paste a YouTube link. The agent reads the transcript, scores moments,
-            and lays captions on a 9:16 preview.
+            Paste a longform YouTube link (8+ minutes). If YouTube blocks captions
+            on Vercel, the Render worker transcribes the first 10 minutes, then
+            OpenAI picks the clip.
+          </p>
+        ) : null}
+        {phase === "idle" && connections && !connections.worker ? (
+          <p className="mt-4 max-w-[46ch] text-[13px] text-warn">
+            CLIP_WORKER_URL is not set. Studio cannot Whisper when YouTube blocks captions.
+          </p>
+        ) : null}
+        {phase === "idle" && connections && !connections.llm ? (
+          <p className="mt-3 max-w-[46ch] text-[13px] text-warn">
+            No LLM key. Set LLM_API_KEY or OPENAI_API_KEY so scoring is not a heuristic guess.
           </p>
         ) : null}
 

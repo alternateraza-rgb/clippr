@@ -1,4 +1,4 @@
-import { env, hasLlm, llmModel, llmProvider } from "@/lib/config";
+import { hasLlm, llmKey, llmModel, llmProvider } from "@/lib/config";
 
 export async function completeJson(input: {
   system: string;
@@ -8,7 +8,7 @@ export async function completeJson(input: {
   if (!hasLlm()) throw new Error("LLM_API_KEY missing");
   const provider = llmProvider();
   const model = llmModel();
-  const key = env("LLM_API_KEY");
+  const key = llmKey();
   const maxTokens = input.maxTokens ?? 1600;
 
   if (provider === "anthropic") {

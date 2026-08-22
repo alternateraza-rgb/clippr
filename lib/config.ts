@@ -8,8 +8,12 @@ export function hasSupabase() {
   return Boolean(env("NEXT_PUBLIC_SUPABASE_URL") && env("NEXT_PUBLIC_SUPABASE_ANON_KEY"));
 }
 
+export function llmKey() {
+  return env("LLM_API_KEY") || env("OPENAI_API_KEY");
+}
+
 export function hasLlm() {
-  return Boolean(env("LLM_API_KEY"));
+  return Boolean(llmKey());
 }
 
 export function hasYouTubeKey() {

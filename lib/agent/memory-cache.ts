@@ -10,10 +10,13 @@ export function analysisKey(videoId: string) {
 }
 
 export function getCachedAnalysis(videoId: string) {
-  return analyses.get(analysisKey(videoId));
+  const hit = analyses.get(analysisKey(videoId));
+  if (hit?.candidates[0]?.id === "nc-1") return undefined;
+  return hit;
 }
 
 export function setCachedAnalysis(videoId: string, result: AnalysisResult) {
+  if (result.candidates[0]?.id === "nc-1") return;
   analyses.set(analysisKey(videoId), result);
 }
 
