@@ -83,7 +83,7 @@ export function timedScript(segments: TranscriptSegment[], maxChars = 28_000) {
     const s = Math.floor(seg.start % 60)
       .toString()
       .padStart(2, "0");
-    return `[${m}:${s}] ${seg.text}`;
+    return `[${m}:${s} | ${Math.round(seg.start)}s] ${seg.text}`;
   });
   let out = "";
   for (const line of lines) {

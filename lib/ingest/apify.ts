@@ -1,5 +1,5 @@
 import { writeFile } from "node:fs/promises";
-import { env, hasApify } from "@/lib/config";
+import { apifyToken, hasApify } from "@/lib/config";
 
 const ACTOR = "datapipe~youtube-video-downloader";
 
@@ -37,7 +37,7 @@ export async function downloadYoutubeViaApify(
   kind: "video" | "audio" = "video",
 ): Promise<boolean> {
   if (!hasApify()) return false;
-  const token = env("APIFY_TOKEN");
+  const token = apifyToken();
   const input =
     kind === "audio"
       ? { videoUrls: [youtubeUrl(videoId)], format: "m4a" }

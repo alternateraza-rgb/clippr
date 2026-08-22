@@ -77,6 +77,7 @@ export function Hero({ exampleClips = [] }: HeroProps) {
               captionLines={demo.captionLines}
               preset="hormozi"
               gameplay="minecraft"
+              fallbackText={demo.hook}
             />
           )}
         </div>

@@ -1,6 +1,8 @@
 import { captionLinesForRange } from "@/lib/agent/compose";
 import { heuristicCandidates } from "@/lib/agent/heuristic";
 import { RUBRIC } from "@/lib/agent/rubric";
+import { snapRange } from "@/lib/agent/snap";
+import { pickOffset } from "@/lib/agent/time";
 import { timedScript, type TranscriptResult } from "@/lib/agent/transcript";
 import { hasLlm } from "@/lib/config";
 import { completeJson } from "@/lib/llm/complete";
@@ -14,63 +16,81 @@ export type ScoreMeta = {
   source: "llm" | "heuristic";
 };
 
-type LlmCandidate = {
-  start: number;
-  end: number;
-  hook: string;
-  whyItClips: string;
-  scores: ScoreBreakdown;
-};
-
 function clampScore(n: unknown) {
   const v = Number(n);
   if (!Number.isFinite(v)) return 50;
   return Math.max(0, Math.min(100, Math.round(v)));
 }
 
-function toCandidates(raw: LlmCandidate[], words: WordTiming[]): ClipCandidate[] {
-  return raw
-    .filter((c) => Number.isFinite(c.start) && Number.isFinite(c.end) && c.end - c.start >= 8)
-    .slice(0, 5)
+function asRows(parsed: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(parsed)) {
+    return parsed.filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object");
+  }
+  if (parsed && typeof parsed === "object") {
+    const o = parsed as Record<string, unknown>;
+    for (const key of ["candidates", "clips", "windows", "results"]) {
+      if (Array.isArray(o[key])) return asRows(o[key]);
+    }
+  }
+  return [];
+}
+
+function toCandidates(raw: unknown, words: WordTiming[]): ClipCandidate[] {
+  return asRows(raw)
     .map((c, i) => {
+      const startRaw = pickOffset(c, ["start", "start_s", "startSec", "startTime", "from", "t0"]);
+      const endRaw = pickOffset(c, ["end", "end_s", "endSec", "endTime", "to", "t1"]);
+      if (startRaw == null || endRaw == null) return null;
+      const hook = String(c.hook || c.title || "").slice(0, 220);
+      const snapped = snapRange(startRaw, Math.max(startRaw + 8, endRaw), hook, words);
+      const start = snapped.start;
+      const finish = snapped.end;
+      const nested = (c.scores && typeof c.scores === "object" ? c.scores : c) as Record<string, unknown>;
       const scores: ScoreBreakdown = {
-        hook: clampScore(c.scores?.hook),
-        emotion: clampScore(c.scores?.emotion),
-        selfContained: clampScore(c.scores?.selfContained),
-        quotability: clampScore(c.scores?.quotability),
-        payoff: clampScore(c.scores?.payoff),
+        hook: clampScore(nested.hook),
+        emotion: clampScore(nested.emotion),
+        selfContained: clampScore(nested.selfContained ?? nested.self_contained),
+        quotability: clampScore(nested.quotability ?? nested.quotable),
+        payoff: clampScore(nested.payoff),
       };
       return {
         id: `c-${i + 1}`,
-        start: Math.max(0, c.start),
-        end: Math.max(c.start + 8, c.end),
-        hook: String(c.hook || "").slice(0, 220),
-        whyItClips: String(c.whyItClips || "").slice(0, 400),
+        start: Math.max(0, start),
+        end: finish,
+        hook,
+        whyItClips: String(c.whyItClips || c.why_it_clips || c.reason || "").slice(0, 400),
         score: weightedScore(scores),
         scores,
-        captionLines: captionLinesForRange(words, c.start, c.end),
-      };
-    });
+        captionLines: captionLinesForRange(words, start, finish),
+      } satisfies ClipCandidate;
+    })
+    .filter((c): c is ClipCandidate => Boolean(c))
+    .slice(0, 5);
 }
 
 async function scoreWithLlm(
   transcript: TranscriptResult,
   niche: Niche,
+  extra?: string,
 ): Promise<{ candidates: ClipCandidate[]; model: string; tokens: number }> {
   const script = timedScript(transcript.segments);
   const { text, tokens, model } = await completeJson({
-    system: `${RUBRIC}\nRespond with JSON: {"candidates":[...]}`,
-    user: `Niche: ${niche}\n\nTranscript:\n${script}`,
+    system: `${RUBRIC}\nRespond with JSON: {"candidates":[{"start":0,"end":20,"hook":"","whyItClips":"","scores":{}}]}`,
+    user: extra ? `${extra}\n\nNiche: ${niche}\n\nTranscript:\n${script}` : `Niche: ${niche}\n\nTranscript:\n${script}`,
   });
-  let parsed: { candidates?: LlmCandidate[] };
+  let parsed: unknown;
   try {
-    parsed = JSON.parse(text) as { candidates?: LlmCandidate[] };
+    parsed = JSON.parse(text);
   } catch {
     throw new Error("LLM returned invalid JSON");
   }
-  const candidates = toCandidates(parsed.candidates ?? [], transcript.words);
+  const candidates = toCandidates(parsed, transcript.words);
   if (!candidates.length) throw new Error("LLM returned no usable clip windows");
   return { candidates, model, tokens };
+}
+
+function blameKey(message: string) {
+  return /401|403|invalid api key|incorrect api key|LLM_API_KEY missing|authentication/i.test(message);
 }
 
 export async function scoreTranscript(
@@ -93,7 +113,11 @@ export async function scoreTranscript(
   let last: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const { candidates, model, tokens } = await scoreWithLlm(transcript, niche);
+      const extra =
+        attempt === 0
+          ? undefined
+          : 'Previous reply was unusable. start and end must be JSON numbers in seconds (522.4), never "8:42". Return {"candidates":[...]} with at least 3 clips of 12–45s.';
+      const { candidates, model, tokens } = await scoreWithLlm(transcript, niche, extra);
       return {
         candidates,
         meta: { model, tokens, ms: Date.now() - started, source: "llm" },
@@ -104,5 +128,8 @@ export async function scoreTranscript(
     }
   }
   const detail = last instanceof Error ? last.message : "unknown error";
-  throw new Error(`LLM scoring failed (${detail}). Check LLM_API_KEY / LLM_PROVIDER on Vercel.`);
+  if (blameKey(detail)) {
+    throw new Error(`LLM scoring failed (${detail}). Check LLM_API_KEY / LLM_PROVIDER on Vercel.`);
+  }
+  throw new Error(`LLM scoring failed (${detail}). The key is set — the model reply could not be turned into clips.`);
 }

@@ -13,5 +13,5 @@ Rules:
 - Prefer complete thoughts. Do not cut mid-sentence.
 - The hook line should be something a viewer could read as a title.
 - whyItClips is one or two sentences, specific to this tape — not generic.
-- start and end are seconds from the start of the video, matching the transcript timestamps.
+- start and end MUST be JSON numbers copied from the transcript seconds field (example: 522.4), never clock strings and never 0 unless that is where the quoted line actually is.
 - If the material is weak, still return at least one candidate and score it honestly (including below 50).`;
