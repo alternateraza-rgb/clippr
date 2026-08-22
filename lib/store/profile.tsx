@@ -49,8 +49,8 @@ function getServerSnapshot() {
 type ProfileContextValue = {
   profile: Profile;
   hydrated: boolean;
-  setProfile: (next: Profile | ((prev: Profile) => Profile)) => void;
-  reset: () => void;
+  setProfile: (next: Profile | ((prev: Profile) => Profile)) => Promise<void>;
+  reset: () => Promise<void>;
 };
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
@@ -58,7 +58,7 @@ const ProfileContext = createContext<ProfileContextValue | null>(null);
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const profile = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  const setProfile = useCallback((next: Profile | ((prev: Profile) => Profile)) => {
+  const setProfile = useCallback(async (next: Profile | ((prev: Profile) => Profile)) => {
     memory = typeof next === "function" ? next(memory) : next;
     try {
       localStorage.setItem(KEY, JSON.stringify(memory));
@@ -66,11 +66,15 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       // ignore quota
     }
     emit();
-    fetch("/api/profile", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(memory),
-    }).catch(() => null);
+    try {
+      await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(memory),
+      });
+    } catch {
+      // offline / unauthenticated — local copy still updated
+    }
   }, []);
 
   const reset = useCallback(() => setProfile(DEFAULT_PROFILE), [setProfile]);

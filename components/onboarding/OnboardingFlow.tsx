@@ -43,8 +43,8 @@ export function OnboardingFlow() {
     setPicking(false);
   }
 
-  function finish() {
-    setProfile({
+  async function finish() {
+    await setProfile({
       ...profile,
       platforms: platforms.length ? platforms : ["youtube"],
       niche,
@@ -53,6 +53,7 @@ export function OnboardingFlow() {
       onboardingComplete: true,
     });
     router.push("/app");
+    router.refresh();
   }
 
   const progress = ((step + 1) / 4) * 100;

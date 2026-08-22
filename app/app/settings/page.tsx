@@ -1,9 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { Chip } from "@/components/ui/Chip";
 import { Pill } from "@/components/ui/Pill";
-import { createBrowserSupabase } from "@/lib/supabase/client";
+import { signOut } from "@/app/auth/actions";
 import { FORMATS, NICHES } from "@/lib/fixtures/niches";
 import { useProfile } from "@/lib/store/profile";
 import type { CaptionPreset, GameplayTrack, Niche, Platform } from "@/lib/agent/types";
@@ -15,7 +14,6 @@ const PLATFORMS: { id: Platform; label: string }[] = [
 ];
 
 export default function SettingsPage() {
-  const router = useRouter();
   const { profile, setProfile, reset } = useProfile();
 
   function togglePlatform(id: Platform) {
@@ -126,15 +124,7 @@ export default function SettingsPage() {
         <Pill variant="ghost" onClick={reset}>
           Reset to demo profile
         </Pill>
-        <Pill
-          variant="outline"
-          onClick={async () => {
-            const supabase = createBrowserSupabase();
-            await supabase?.auth.signOut();
-            router.push("/");
-            router.refresh();
-          }}
-        >
+        <Pill variant="outline" onClick={() => void signOut()}>
           Sign out
         </Pill>
       </div>
