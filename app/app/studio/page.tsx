@@ -524,6 +524,7 @@ function StudioInner() {
               captionLines={selected.captionLines}
               preset={preset}
               gameplay={gameplay}
+              fallbackText={selected.hook || selected.whyItClips}
             />
             <div className="mt-5 rounded-[12px] bg-surface p-5 shadow-hairline">
               <ScoreBreakdown scores={selected.scores} />
