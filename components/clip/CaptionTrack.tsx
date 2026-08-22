@@ -24,7 +24,7 @@ export function CaptionTrack({
   return (
     <p
       className={cn(
-        "pointer-events-none absolute inset-x-3 z-20 flex items-center justify-center gap-1.5 text-center leading-none",
+        "pointer-events-none absolute inset-x-3 z-40 flex items-center justify-center gap-1.5 text-center leading-none",
         "bottom-[14%] flex-nowrap overflow-visible font-caption font-normal uppercase tracking-[-0.04em]",
         preset === "hormozi" && "text-[clamp(22px,6.4vw,34px)]",
         preset === "clean" && "text-[clamp(20px,5.8vw,30px)]",

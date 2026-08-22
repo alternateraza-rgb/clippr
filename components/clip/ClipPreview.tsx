@@ -177,7 +177,7 @@ export function ClipPreview({
         <button
           type="button"
           onClick={() => setPlaying(true)}
-          className="absolute inset-0 z-30 flex items-center justify-center bg-ink/25"
+          className="absolute inset-x-0 top-0 bottom-[22%] z-30 flex items-center justify-center bg-ink/25"
         >
           <span className="rounded-full bg-on-brand/95 px-5 py-2 text-[13px] text-ink shadow-hairline">
             Play preview
