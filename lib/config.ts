@@ -45,7 +45,11 @@ export function hasSupadata() {
 }
 
 export function hasApify() {
-  return Boolean(env("APIFY_TOKEN"));
+  return Boolean(apifyToken());
+}
+
+export function apifyToken() {
+  return env("APIFY_TOKEN") || env("APIFY_API_TOKEN");
 }
 
 export function llmProvider() {

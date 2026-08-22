@@ -23,7 +23,11 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       const send = (packet: StreamPacket) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(packet)}\n\n`));
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(packet)}\n\n`));
+        } catch {
+          /* stream already closed */
+        }
       };
       try {
         if (cached) {
