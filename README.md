@@ -66,7 +66,7 @@ Use the same host everywhere (`127.0.0.1` vs `localhost`). Mixing them drops the
 
 ## Render worker
 
-Keep Render for **ffmpeg only**. Set `APIFY_TOKEN` (and optionally `SUPADATA_API_KEY`) on that service so it never calls youtube.com. Health check: `GET /health`.
+Keep Render for **ffmpeg only**. Set `APIFY_TOKEN` (and optionally `SUPADATA_API_KEY`) on that service so it never calls youtube.com. Health check: `GET /health` returns `{ apify, llm, ffmpeg }`.
 
 ## Discovery
 

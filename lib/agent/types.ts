@@ -156,6 +156,7 @@ export type AnalysisResult = {
   video: VideoMeta;
   candidates: ClipCandidate[];
   events: AgentEvent[];
+  scoreSource?: "llm" | "heuristic";
 };
 
 export type NicheMeta = {

@@ -22,6 +22,8 @@ type YtPlayer = {
   getPlayerState: () => number;
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
   playVideo: () => void;
+  unMute?: () => void;
+  setVolume?: (n: number) => void;
   destroy: () => void;
 };
 
@@ -68,6 +70,15 @@ function loadApi() {
   });
 }
 
+function armPlayer(player: YtPlayer, start: number, withAudio: boolean) {
+  if (withAudio) {
+    player.unMute?.();
+    player.setVolume?.(100);
+  }
+  player.seekTo(start, true);
+  player.playVideo();
+}
+
 export function ClipPreview({
   videoId,
   start,
@@ -83,11 +94,12 @@ export function ClipPreview({
   const [playing, setPlaying] = useState(autoPlay);
   const [time, setTime] = useState(0);
   const split = gameplay !== "none";
+  const withAudio = !autoPlay;
 
   useEffect(() => {
     if (!playing || !mount.current) return;
     let cancelled = false;
-    let interval: number | undefined;
+    let raf = 0;
     const host = mount.current;
     if (!host) return;
     const el = document.createElement("div");
@@ -98,39 +110,49 @@ export function ClipPreview({
       player.current = new window.YT.Player(el, {
         videoId,
         playerVars: {
-          start: Math.floor(start),
-          end: Math.ceil(start + duration),
           autoplay: 1,
-          mute: 1,
+          mute: withAudio ? 0 : 1,
           controls: 0,
           modestbranding: 1,
           rel: 0,
           playsinline: 1,
         },
         events: {
-          onReady: (e) => e.target.playVideo(),
+          onReady: (e) => armPlayer(e.target, start, withAudio),
           onStateChange: (e) => {
             if (e.data === window.YT?.PlayerState?.ENDED) {
-              e.target.seekTo(start, true);
-              e.target.playVideo();
+              armPlayer(e.target, start, withAudio);
+            }
+            if (e.data === window.YT?.PlayerState?.PLAYING && withAudio) {
+              e.target.unMute?.();
+              e.target.setVolume?.(100);
             }
           },
         },
       });
-      interval = window.setInterval(() => {
+      const tick = () => {
         const current = player.current?.getCurrentTime?.() ?? start;
-        const rel = Math.max(0, current - start);
-        setTime(rel % Math.max(duration, 0.1));
-      }, 80);
+        const span = Math.max(duration, 0.1);
+        const rel = current - start;
+        if (rel < -0.15) {
+          setTime(0);
+        } else if (rel >= span) {
+          setTime(span);
+        } else {
+          setTime(Math.max(0, rel));
+        }
+        raf = window.requestAnimationFrame(tick);
+      };
+      raf = window.requestAnimationFrame(tick);
     });
     return () => {
       cancelled = true;
-      if (interval) window.clearInterval(interval);
+      if (raf) window.cancelAnimationFrame(raf);
       player.current?.destroy();
       player.current = null;
       el.remove();
     };
-  }, [playing, videoId, start, duration]);
+  }, [playing, videoId, start, duration, withAudio]);
 
   return (
     <div

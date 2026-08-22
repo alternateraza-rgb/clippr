@@ -1,5 +1,5 @@
 import { runAnalysis, type StreamPacket } from "@/lib/agent/run";
-import { getCachedAnalysis, setCachedAnalysis } from "@/lib/agent/memory-cache";
+import { clearCachedAnalysis, getCachedAnalysis, setCachedAnalysis } from "@/lib/agent/memory-cache";
 import { parseYouTubeId } from "@/lib/youtube";
 import type { Niche } from "@/lib/agent/types";
 
@@ -11,13 +11,15 @@ export async function POST(request: Request) {
     url?: string;
     videoId?: string;
     niche?: Niche;
+    refresh?: boolean;
   };
   const videoId = parseYouTubeId(body.videoId || body.url || "");
   if (!videoId) {
     return Response.json({ message: "That doesn’t look like a YouTube link." }, { status: 400 });
   }
 
-  const cached = getCachedAnalysis(videoId);
+  if (body.refresh) clearCachedAnalysis(videoId);
+  const cached = body.refresh ? undefined : getCachedAnalysis(videoId);
   const stream = new ReadableStream({
     async start(controller) {
       const send = (packet: StreamPacket) => {
@@ -31,7 +33,9 @@ export async function POST(request: Request) {
           controller.close();
           return;
         }
-        for await (const packet of runAnalysis(videoId, body.niche ?? "finance")) {
+        for await (const packet of runAnalysis(videoId, body.niche ?? "finance", {
+          bypassCache: Boolean(body.refresh),
+        })) {
           send(packet);
           if (packet.type === "result") setCachedAnalysis(videoId, packet.analysis);
         }

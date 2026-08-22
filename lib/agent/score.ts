@@ -53,11 +53,35 @@ function toCandidates(raw: LlmCandidate[], words: WordTiming[]): ClipCandidate[]
     });
 }
 
+async function scoreWithLlm(
+  transcript: TranscriptResult,
+  niche: Niche,
+): Promise<{ candidates: ClipCandidate[]; model: string; tokens: number }> {
+  const script = timedScript(transcript.segments);
+  const { text, tokens, model } = await completeJson({
+    system: `${RUBRIC}\nRespond with JSON: {"candidates":[...]}`,
+    user: `Niche: ${niche}\n\nTranscript:\n${script}`,
+  });
+  let parsed: { candidates?: LlmCandidate[] };
+  try {
+    parsed = JSON.parse(text) as { candidates?: LlmCandidate[] };
+  } catch {
+    throw new Error("LLM returned invalid JSON");
+  }
+  const candidates = toCandidates(parsed.candidates ?? [], transcript.words);
+  if (!candidates.length) throw new Error("LLM returned no usable clip windows");
+  return { candidates, model, tokens };
+}
+
 export async function scoreTranscript(
   transcript: TranscriptResult,
   niche: Niche,
 ): Promise<{ candidates: ClipCandidate[]; meta: ScoreMeta }> {
-  if (!hasLlm() || !transcript.words.length) {
+  if (!transcript.words.length) {
+    throw new Error("No transcript words to score.");
+  }
+
+  if (!hasLlm()) {
     const started = Date.now();
     return {
       candidates: heuristicCandidates(transcript.words),
@@ -66,26 +90,19 @@ export async function scoreTranscript(
   }
 
   const started = Date.now();
-  const script = timedScript(transcript.segments);
-  const user = `Niche: ${niche}\n\nTranscript:\n${script}`;
-
-  try {
-    const { text, tokens, model } = await completeJson({
-      system: `${RUBRIC}\nRespond with JSON: {"candidates":[...]}`,
-      user,
-    });
-    const parsed = JSON.parse(text) as { candidates?: LlmCandidate[] };
-    const candidates = toCandidates(parsed.candidates ?? [], transcript.words);
-    if (!candidates.length) throw new Error("empty llm candidates");
-    return {
-      candidates,
-      meta: { model, tokens, ms: Date.now() - started, source: "llm" },
-    };
-  } catch {
-    return {
-      candidates: heuristicCandidates(transcript.words),
-      meta: { model: "heuristic", tokens: 0, ms: Date.now() - started, source: "heuristic" },
-    };
+  let last: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { candidates, model, tokens } = await scoreWithLlm(transcript, niche);
+      return {
+        candidates,
+        meta: { model, tokens, ms: Date.now() - started, source: "llm" },
+      };
+    } catch (error) {
+      last = error;
+      console.error("[score] LLM attempt failed", attempt + 1, error);
+    }
   }
+  const detail = last instanceof Error ? last.message : "unknown error";
+  throw new Error(`LLM scoring failed (${detail}). Check LLM_API_KEY / LLM_PROVIDER on Vercel.`);
 }
-

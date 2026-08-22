@@ -19,8 +19,9 @@
   --color-on-brand: #fdfcfc;
 
   --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-instrument), var(--font-geist), ui-sans-serif, sans-serif;
+  --font-display: var(--font-instrument), var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-serif-italic), Georgia, "Times New Roman", serif;
+  --font-caption: var(--font-anton), Anton, Impact, "Arial Black", sans-serif;
 
   --shadow-hairline:
     inset 0 0 0 0.5px rgb(0 0 0 / 0.06),

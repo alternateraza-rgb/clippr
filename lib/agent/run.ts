@@ -1,9 +1,8 @@
 import { captionLinesForRange } from "@/lib/agent/compose";
-import { heuristicCandidates } from "@/lib/agent/heuristic";
 import { scoreTranscript } from "@/lib/agent/score";
 import { CaptionsDisabledError, fetchTranscript } from "@/lib/agent/transcript";
 import type { AgentEvent, AgentStage, AnalysisResult, Niche } from "@/lib/agent/types";
-import { isDemoMode, workerUrl, hasSupadata } from "@/lib/config";
+import { hasLlm, isDemoMode, workerUrl, hasSupadata } from "@/lib/config";
 import { analysisFor } from "@/lib/fixtures/analyses";
 import { formatDuration } from "@/lib/format";
 import { fetchSupadataTranscript } from "@/lib/ingest/supadata";
@@ -40,6 +39,7 @@ async function waitForTranscript(videoId: string, tries = 4) {
 export async function* runAnalysis(
   videoId: string,
   niche: Niche = "finance",
+  opts?: { bypassCache?: boolean },
 ): AsyncGenerator<StreamPacket> {
   const t0 = Date.now();
   const events: AgentEvent[] = [];
@@ -59,7 +59,7 @@ export async function* runAnalysis(
   }
 
   try {
-    const persisted = await readAnalysisCache(videoId);
+    const persisted = opts?.bypassCache ? null : await readAnalysisCache(videoId);
     if (persisted) {
       yield emit("resolve", "Cache hit — skipping the model");
       yield emit("done", "Ready.");
@@ -145,14 +145,23 @@ export async function* runAnalysis(
 
     yield emit("score", "Scoring windows against the retention rubric");
     const { candidates, meta } = await scoreTranscript(transcript, niche);
-    const filled = (candidates.length ? candidates : heuristicCandidates(transcript.words)).map(
-      (c) => ({
-        ...c,
-        captionLines: c.captionLines.length
-          ? c.captionLines
-          : captionLinesForRange(transcript.words, c.start, c.end),
-      }),
-    );
+    if (hasLlm() && meta.source !== "llm") {
+      yield {
+        type: "error",
+        message: "LLM scoring did not run. Check LLM_API_KEY on Vercel.",
+      };
+      return;
+    }
+    const filled = candidates.map((c) => ({
+      ...c,
+      captionLines: c.captionLines.length
+        ? c.captionLines
+        : captionLinesForRange(transcript.words, c.start, c.end),
+    }));
+    if (!filled.length) {
+      yield { type: "error", message: "No clip windows came back from scoring." };
+      return;
+    }
     const top = filled[0];
     if (top) {
       yield emit(
@@ -163,7 +172,12 @@ export async function* runAnalysis(
     yield emit("compose", `Composing ${filled.length} cuts · ${meta.source} · ${meta.ms}ms`);
     yield emit("done", filled.length ? "Ready." : "No strong cuts on this tape.");
 
-    const analysis: AnalysisResult = { video, candidates: filled, events: [...events] };
+    const analysis: AnalysisResult = {
+      video,
+      candidates: filled,
+      events: [...events],
+      scoreSource: meta.source,
+    };
     await writeAnalysisCache(videoId, analysis, {
       niche,
       model: meta.model,

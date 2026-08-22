@@ -24,6 +24,8 @@ export default function SettingsPage() {
     authEnabled?: boolean;
     ingest?: boolean;
     download?: boolean;
+    workerApify?: boolean;
+    workerFfmpeg?: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -70,12 +72,21 @@ export default function SettingsPage() {
             </li>
             <li>
               {connections.download
-                ? "Apify is on (cloud YouTube download)."
-                : "Set APIFY_TOKEN so export does not hit YouTube from Render."}
+                ? "Apify token is set on Vercel."
+                : "Set APIFY_TOKEN on Vercel (and Render) so export does not hit YouTube."}
+            </li>
+            <li>
+              {connections.workerApify
+                ? "Render worker has Apify (cloud download)."
+                : connections.worker
+                  ? "Render worker is up, but APIFY_TOKEN is missing on that service."
+                  : "Set CLIP_WORKER_URL + CLIP_WORKER_SECRET for ffmpeg export."}
             </li>
             <li>
               {connections.worker
-                ? "Render worker URL is set."
+                ? connections.workerFfmpeg
+                  ? "ffmpeg is present on the worker."
+                  : "Render worker URL is set."
                 : "Set CLIP_WORKER_URL + CLIP_WORKER_SECRET for ffmpeg export."}
             </li>
             <li>
