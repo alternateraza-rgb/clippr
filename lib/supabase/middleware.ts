@@ -1,6 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+function copyCookies(from: NextResponse, to: NextResponse) {
+  from.cookies.getAll().forEach((cookie) => to.cookies.set(cookie));
+  return to;
+}
+
 export async function updateSession(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -33,28 +38,34 @@ export async function updateSession(request: NextRequest) {
   const isAuth = path === "/login" || path === "/signup";
   const isOnboarding = path.startsWith("/onboarding");
 
-  if (isApp && !user) {
+  const bounce = (pathname: string) => {
     const redirect = request.nextUrl.clone();
-    redirect.pathname = "/login";
-    return NextResponse.redirect(redirect);
+    redirect.pathname = pathname;
+    redirect.search = "";
+    return copyCookies(response, NextResponse.redirect(redirect));
+  };
+
+  if ((isApp || isOnboarding) && !user) {
+    return bounce("/login");
   }
 
   if (user && isAuth) {
-    const redirect = request.nextUrl.clone();
-    redirect.pathname = "/app";
-    return NextResponse.redirect(redirect);
-  }
-
-  if (user && isApp && !isOnboarding) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("onboarding_complete")
       .eq("id", user.id)
       .maybeSingle();
-    if (profile && profile.onboarding_complete === false) {
-      const redirect = request.nextUrl.clone();
-      redirect.pathname = "/onboarding";
-      return NextResponse.redirect(redirect);
+    return bounce(profile?.onboarding_complete === false ? "/onboarding" : "/app");
+  }
+
+  if (user && isApp) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("onboarding_complete")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (!profile || profile.onboarding_complete === false) {
+      return bounce("/onboarding");
     }
   }
 

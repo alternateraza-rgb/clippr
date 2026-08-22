@@ -12,7 +12,7 @@ export type TranscriptResult = {
   segments: TranscriptSegment[];
   words: WordTiming[];
   language: string;
-  source: "captions" | "none";
+  source: "captions" | "whisper" | "none";
   title?: string;
 };
 

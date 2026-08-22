@@ -1,0 +1,11 @@
+# Clipmuse render worker (Docker / Render)
+node_modules
+.next
+.git
+.env*
+*.md
+app
+components
+public
+scripts
+supabase

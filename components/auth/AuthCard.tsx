@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useActionState, useState } from "react";
+import { login, signup, type AuthState } from "@/app/auth/actions";
 import { Orb } from "@/components/motion/Orb";
 import { Pill } from "@/components/ui/Pill";
 import { Wordmark } from "@/components/ui/Wordmark";
-import { createBrowserSupabase } from "@/lib/supabase/client";
+import { hasSupabase } from "@/lib/config";
 import { useProfile } from "@/lib/store/profile";
+
+const INITIAL: AuthState = {};
 
 export function AuthCard({
   title,
@@ -15,6 +17,7 @@ export function AuthCard({
   href,
   showName,
   footer,
+  initialError,
 }: {
   title: string;
   subtitle: string;
@@ -22,67 +25,91 @@ export function AuthCard({
   href: string;
   showName?: boolean;
   footer: React.ReactNode;
+  initialError?: string;
 }) {
-  const router = useRouter();
   const { profile, setProfile } = useProfile();
   const [name, setName] = useState(profile.displayName);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [pending, setPending] = useState(false);
-  const [authEnabled, setAuthEnabled] = useState(false);
+  const authEnabled = hasSupabase();
+  const [state, formAction, pending] = useActionState(
+    showName ? signup : login,
+    INITIAL,
+  );
 
-  useEffect(() => {
-    fetch("/api/config")
-      .then((r) => r.json())
-      .then((d) => setAuthEnabled(Boolean(d.authEnabled)))
-      .catch(() => setAuthEnabled(false));
-  }, []);
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    if (showName && name.trim()) {
-      setProfile({ ...profile, displayName: name.trim() });
-    }
-    if (!authEnabled) {
-      router.push(href);
-      return;
-    }
-    setPending(true);
-    const supabase = createBrowserSupabase();
-    if (!supabase) {
-      router.push(href);
-      return;
-    }
-    try {
-      if (showName) {
-        const { error: signError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { display_name: name.trim() },
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
-          },
-        });
-        if (signError) throw signError;
-        router.push("/onboarding");
-      } else {
-        const { error: signError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (signError) throw signError;
-        router.push("/app");
-        router.refresh();
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not sign in");
-    } finally {
-      setPending(false);
-    }
+  if (state.checkEmail) {
+    return (
+      <Shell title="Check your email." subtitle="Confirm the link we sent, then you’ll land in onboarding.">
+        <p className="mt-8 text-[14px] text-muted">{footer}</p>
+      </Shell>
+    );
   }
 
+  return (
+    <Shell title={title} subtitle={subtitle}>
+      <form
+        className="mt-10 space-y-3"
+        action={formAction}
+        onSubmit={() => {
+          if (showName && name.trim()) {
+            void setProfile({ ...profile, displayName: name.trim() });
+          }
+        }}
+      >
+        {showName ? (
+          <input
+            name="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Your name"
+            autoComplete="name"
+            className="w-full rounded-full bg-surface px-5 py-3 text-[15px] shadow-hairline outline-none placeholder:text-muted"
+          />
+        ) : null}
+        <input
+          type="email"
+          name="email"
+          required={authEnabled}
+          autoComplete="email"
+          placeholder="Email"
+          className="w-full rounded-full bg-surface px-5 py-3 text-[15px] shadow-hairline outline-none placeholder:text-muted"
+        />
+        <input
+          type="password"
+          name="password"
+          required={authEnabled}
+          autoComplete={showName ? "new-password" : "current-password"}
+          placeholder="Password"
+          minLength={authEnabled ? 6 : undefined}
+          className="w-full rounded-full bg-surface px-5 py-3 text-[15px] shadow-hairline outline-none placeholder:text-muted"
+        />
+        {state.error || initialError ? (
+          <p className="text-[13px] text-brand">{state.error || initialError}</p>
+        ) : null}
+        {!authEnabled ? (
+          <input type="hidden" name="demo" value="1" />
+        ) : null}
+        <Pill type="submit" className="mt-4 w-full" disabled={pending}>
+          {pending ? "Working…" : action}
+        </Pill>
+      </form>
+      {!authEnabled ? (
+        <p className="mt-4 text-[13px] text-muted">
+          Auth is off in this environment — continue goes straight to {href}.
+        </p>
+      ) : null}
+      <p className="mt-8 text-[14px] text-muted">{footer}</p>
+    </Shell>
+  );
+}
+
+function Shell({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="relative min-h-screen overflow-hidden bg-canvas">
       <Orb className="-right-20 top-10 h-[380px] w-[380px]" />
@@ -90,38 +117,7 @@ export function AuthCard({
         <Wordmark />
         <h1 className="display mt-14 text-[clamp(36px,6vw,48px)]">{title}</h1>
         <p className="mt-4 text-body">{subtitle}</p>
-        <form className="mt-10 space-y-3" onSubmit={onSubmit}>
-          {showName ? (
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-              className="w-full rounded-full bg-surface px-5 py-3 text-[15px] shadow-hairline outline-none placeholder:text-muted"
-            />
-          ) : null}
-          <input
-            type="email"
-            required={authEnabled}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
-            className="w-full rounded-full bg-surface px-5 py-3 text-[15px] shadow-hairline outline-none placeholder:text-muted"
-          />
-          <input
-            type="password"
-            required={authEnabled}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            minLength={6}
-            className="w-full rounded-full bg-surface px-5 py-3 text-[15px] shadow-hairline outline-none placeholder:text-muted"
-          />
-          {error ? <p className="text-[13px] text-brand">{error}</p> : null}
-          <Pill type="submit" className="mt-4 w-full" disabled={pending}>
-            {pending ? "Working…" : action}
-          </Pill>
-        </form>
-        <p className="mt-8 text-[14px] text-muted">{footer}</p>
+        {children}
       </div>
     </div>
   );
