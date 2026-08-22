@@ -1,6 +1,12 @@
 import { cn } from "@/lib/cn";
 import type { GameplayTrack } from "@/lib/agent/types";
 
+function publicGameplayUrl(track: Exclude<GameplayTrack, "none">) {
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
+  if (!base) return "";
+  return `${base}/storage/v1/object/public/gameplay/${track}.mp4`;
+}
+
 export function GameplayPane({
   track,
   className,
@@ -9,13 +15,27 @@ export function GameplayPane({
   className?: string;
 }) {
   if (track === "none") return null;
+  const src = publicGameplayUrl(track);
 
   return (
-    <div className={cn("relative h-full w-full overflow-hidden", className)}>
+    <div className={cn("relative h-full w-full overflow-hidden bg-ink", className)}>
       {track === "minecraft" ? <MinecraftLoop /> : null}
       {track === "gta" ? <GtaLoop /> : null}
       {track === "subway" ? <SubwayLoop /> : null}
-      <div className="absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-black/25 to-transparent" />
+      {src ? (
+        <video
+          src={src}
+          className="absolute inset-0 z-10 h-full w-full object-cover"
+          autoPlay
+          muted
+          loop
+          playsInline
+          onError={(e) => {
+            (e.currentTarget as HTMLVideoElement).style.display = "none";
+          }}
+        />
+      ) : null}
+      <div className="absolute inset-x-0 top-0 z-20 h-10 bg-gradient-to-b from-black/25 to-transparent" />
     </div>
   );
 }

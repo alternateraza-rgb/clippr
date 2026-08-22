@@ -51,6 +51,19 @@ async function findMedia(dir: string) {
   return join(dir, hit);
 }
 
+async function fetchGameplayLoop(
+  dir: string,
+  track: string | null,
+  admin: NonNullable<ReturnType<typeof createAdminClient>>,
+) {
+  if (!track || track === "none") return null;
+  const { data, error } = await admin.storage.from("gameplay").download(`${track}.mp4`);
+  if (error || !data) return null;
+  const dest = join(dir, "gameplay.mp4");
+  await writeFile(dest, Buffer.from(await data.arrayBuffer()));
+  return dest;
+}
+
 export async function processRender(renderId: string) {
   const admin = createAdminClient();
   if (!admin) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
@@ -135,33 +148,79 @@ export async function processRender(renderId: string) {
     const fontsDir = existsSync("/usr/share/fonts/truetype/liberation")
       ? ":fontsdir=/usr/share/fonts/truetype/liberation"
       : "";
-    const vf = [
-      "scale=720:1280:force_original_aspect_ratio=increase",
-      "crop=720:1280",
-      `ass=${assPath.replace(/\\/g, "/").replace(/:/g, "\\:")}${fontsDir}`,
-    ].join(",");
-    await run("ffmpeg", [
-      "-y",
-      "-i",
-      raw,
-      "-vf",
-      vf,
-      "-c:v",
-      "libx264",
-      "-preset",
-      "ultrafast",
-      "-crf",
-      "23",
-      "-c:a",
-      "aac",
-      "-b:a",
-      "128k",
-      "-movflags",
-      "+faststart",
-      "-pix_fmt",
-      "yuv420p",
-      out,
-    ]);
+    const assFilter = `ass=${assPath.replace(/\\/g, "/").replace(/:/g, "\\:")}${fontsDir}`;
+    const gameplayFile = await fetchGameplayLoop(dir, row.gameplay, admin);
+    const duration = Math.max(1, end - start);
+
+    const vf = gameplayFile
+      ? [
+          "[0:v]scale=720:692:force_original_aspect_ratio=increase,crop=720:692[top]",
+          "[1:v]scale=720:588:force_original_aspect_ratio=increase,crop=720:588[bot]",
+          "[top][bot]vstack=inputs=2[stack]",
+          `[stack]${assFilter}[v]`,
+        ].join(";")
+      : [
+          "scale=720:1280:force_original_aspect_ratio=increase",
+          "crop=720:1280",
+          assFilter,
+        ].join(",");
+    const ffArgs = gameplayFile
+      ? [
+          "-y",
+          "-i",
+          raw,
+          "-stream_loop",
+          "-1",
+          "-i",
+          gameplayFile,
+          "-t",
+          duration.toFixed(2),
+          "-filter_complex",
+          vf,
+          "-map",
+          "[v]",
+          "-map",
+          "0:a?",
+          "-c:v",
+          "libx264",
+          "-preset",
+          "ultrafast",
+          "-crf",
+          "23",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "128k",
+          "-shortest",
+          "-movflags",
+          "+faststart",
+          "-pix_fmt",
+          "yuv420p",
+          out,
+        ]
+      : [
+          "-y",
+          "-i",
+          raw,
+          "-vf",
+          vf,
+          "-c:v",
+          "libx264",
+          "-preset",
+          "ultrafast",
+          "-crf",
+          "23",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "128k",
+          "-movflags",
+          "+faststart",
+          "-pix_fmt",
+          "yuv420p",
+          out,
+        ];
+    await run("ffmpeg", ffArgs);
 
     const bytes = await readFile(out);
     const info = await stat(out);

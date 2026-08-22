@@ -129,7 +129,7 @@ function StudioInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialId]);
 
-  const noCaptions = analysis && !analysis.video.captionsAvailable;
+  const noCaptions = Boolean(analysis && selected && selected.captionLines.length === 0);
 
   const duration = useMemo(() => {
     if (!selected) return 12;
@@ -259,7 +259,7 @@ function StudioInner() {
               setError("");
             }}
             onSubmit={submit}
-            placeholder="Paste a YouTube link"
+            placeholder="Paste a long YouTube link (8+ min)"
           />
           {error ? <p className="mt-3 text-[13px] text-brand">{error}</p> : null}
           {noCaptions && phase !== "idle" ? (
@@ -286,8 +286,9 @@ function StudioInner() {
 
         {phase === "idle" ? (
           <p className="mt-16 max-w-[40ch] text-body">
-            Paste a YouTube link. The agent reads the transcript, scores moments,
-            and lays captions on a 9:16 preview.
+            Paste a longform YouTube link (8+ minutes). If YouTube blocks captions
+            on Vercel, the Render worker transcribes the first 10 minutes, then
+            OpenAI picks the clip.
           </p>
         ) : null}
 

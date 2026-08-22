@@ -3,7 +3,7 @@ import { heuristicCandidates } from "@/lib/agent/heuristic";
 import { scoreTranscript } from "@/lib/agent/score";
 import { CaptionsDisabledError, fetchTranscript } from "@/lib/agent/transcript";
 import type { AgentEvent, AgentStage, AnalysisResult, Niche } from "@/lib/agent/types";
-import { isDemoMode } from "@/lib/config";
+import { isDemoMode, workerUrl } from "@/lib/config";
 import { analysisFor } from "@/lib/fixtures/analyses";
 import { formatDuration } from "@/lib/format";
 import {
@@ -14,12 +14,26 @@ import {
   writeTranscriptCache,
   writeVideoCache,
 } from "@/lib/supabase/cache";
+import { requestTranscribe } from "@/lib/worker/client";
 import { hydrateVideo } from "@/lib/youtube/meta";
 
 export type StreamPacket =
   | { type: "event"; stage: AgentStage; message: string; at: number }
   | { type: "result"; analysis: AnalysisResult }
   | { type: "error"; message: string };
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function waitForTranscript(videoId: string, tries = 24) {
+  for (let i = 0; i < tries; i++) {
+    const hit = await readTranscriptCache(videoId);
+    if (hit?.words.length) return hit;
+    await sleep(2500);
+  }
+  return null;
+}
 
 export async function* runAnalysis(
   videoId: string,
@@ -57,6 +71,13 @@ export async function* runAnalysis(
       video = await hydrateVideo(videoId);
       await writeVideoCache(video);
     }
+    if (video.durationS > 0 && video.durationS < 8 * 60) {
+      yield {
+        type: "error",
+        message: "Need a longform video (8+ minutes). Shorts and clips this short cannot be scored.",
+      };
+      return;
+    }
     yield emit(
       "resolve",
       `Resolved · ${video.durationS ? formatDuration(video.durationS) : "live metadata"} · ${video.channel}`,
@@ -69,56 +90,40 @@ export async function* runAnalysis(
         if (error instanceof CaptionsDisabledError) return null;
         throw error;
       });
-      if (transcript) await writeTranscriptCache(videoId, transcript);
+      if (transcript?.words.length) await writeTranscriptCache(videoId, transcript);
     }
 
-    if (!transcript || transcript.source === "none" || !transcript.words.length) {
-      video.captionsAvailable = false;
-      await writeVideoCache(video);
-      if (!transcript || transcript.source !== "none") {
-        await writeTranscriptCache(videoId, {
-          segments: [],
-          words: [],
-          language: "en",
-          source: "none",
-        });
+    if (!transcript?.words.length && workerUrl()) {
+      yield emit("transcribe", "No captions on Vercel — sending audio to the worker…");
+      const ping = await requestTranscribe(videoId);
+      if (!ping.ok) {
+        yield {
+          type: "error",
+          message:
+            ping.reason === "not_configured"
+              ? "Set CLIP_WORKER_URL so we can transcribe when YouTube blocks captions."
+              : `Worker did not accept transcribe (${ping.reason}).`,
+        };
+        return;
       }
-      yield emit("transcribe", "Captions are disabled on this video");
-      yield emit("score", "Falling back to a chapter-less heuristic");
-      yield emit("done", "Ready. No spoken captions.");
+      yield emit("transcribe", "Waiting on Whisper / auto-captions (Render may be waking up)…");
+      transcript = await waitForTranscript(videoId);
+    }
+
+    if (!transcript?.words.length) {
       yield {
-        type: "result",
-        analysis: {
-          video,
-          events,
-          candidates: [
-            {
-              id: "nc-1",
-              start: 0,
-              end: 24,
-              hook: "No transcript — open on the first 24 seconds",
-              whyItClips:
-                "Captions were disabled. Karaoke will be empty; this is a starting cut, not a scored recommendation.",
-              score: 52,
-              scores: {
-                hook: 50,
-                emotion: 40,
-                selfContained: 70,
-                quotability: 30,
-                payoff: 55,
-              },
-              captionLines: [],
-            },
-          ],
-        },
+        type: "error",
+        message:
+          "Could not get a transcript. The worker downloads captions or Whisper on the first 10 minutes — check Render logs and CLIP_WORKER_URL.",
       };
       return;
     }
 
     video.captionsAvailable = true;
+    await writeVideoCache(video);
     yield emit(
       "transcribe",
-      `${transcript.words.length.toLocaleString()} words · ${transcript.language}`,
+      `${transcript.words.length.toLocaleString()} words · ${transcript.language} · ${transcript.source}`,
     );
 
     yield emit("score", "Scoring windows against the retention rubric");

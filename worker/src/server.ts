@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { env, workerSecret } from "../../lib/config";
 import { drainQueued, processRender } from "./render";
+import { processTranscribe } from "./transcribe";
 
 const PORT = Number(env("PORT") || 8787);
 const HOST = "0.0.0.0";
@@ -8,6 +9,35 @@ const HOST = "0.0.0.0";
 let pumping = false;
 const queue: string[] = [];
 const seen = new Set<string>();
+
+let transcribing = false;
+const transcribeQueue: string[] = [];
+const transcribeSeen = new Set<string>();
+
+function enqueueTranscribe(id: string) {
+  if (!id) return;
+  if (transcribeQueue.includes(id) || transcribeSeen.has(id)) return;
+  transcribeQueue.push(id);
+  void pumpTranscribe();
+}
+
+async function pumpTranscribe() {
+  if (transcribing) return;
+  transcribing = true;
+  while (transcribeQueue.length) {
+    const id = transcribeQueue.shift();
+    if (!id) continue;
+    transcribeSeen.add(id);
+    try {
+      await processTranscribe(id);
+    } catch (error) {
+      console.error("[worker] transcribe failed", id, error);
+    } finally {
+      transcribeSeen.delete(id);
+    }
+  }
+  transcribing = false;
+}
 
 function enqueue(id: string) {
   if (!id) return;
@@ -64,17 +94,30 @@ const server = createServer(async (req, res) => {
 
   if (req.method === "GET" && url.pathname === "/health") {
     res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ ok: true, queue: queue.length, busy: pumping }));
+    res.end(JSON.stringify({ ok: true, queue: queue.length, busy: pumping, transcribe: transcribeQueue.length }));
     return;
   }
 
-  if (req.method === "POST" && (url.pathname === "/render" || url.pathname === "/drain")) {
+  if (req.method === "POST" && (url.pathname === "/render" || url.pathname === "/drain" || url.pathname === "/transcribe")) {
     if (!authorize(req)) {
       res.writeHead(401, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: false, reason: "unauthorized" }));
       return;
     }
     try {
+      if (url.pathname === "/transcribe") {
+        const body = await readJson(req);
+        const videoId = String(body.videoId || body.id || "");
+        if (!videoId) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: false, reason: "missing_videoId" }));
+          return;
+        }
+        enqueueTranscribe(videoId);
+        res.writeHead(202, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true, videoId }));
+        return;
+      }
       if (url.pathname === "/drain") {
         const ids = await drainQueued();
         ids.forEach(enqueue);

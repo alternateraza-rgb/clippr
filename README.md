@@ -19,9 +19,8 @@ npm run worker               # local render worker (needs yt-dlp + ffmpeg)
 
 | Key | Purpose |
 |---|---|
-| `LLM_API_KEY` | OpenAI or Anthropic. Plans search queries, ranks the feed, scores clips. Missing → heuristics |
-| `LLM_PROVIDER` | `openai` (default) or `anthropic` |
-| `OPENAI_API_KEY` | Optional. Worker Whisper uses this, else `LLM_API_KEY` |
+| `LLM_API_KEY` | OpenAI (or Anthropic). Brain + worker. `OPENAI_API_KEY` is accepted as an alias. |
+| `OPENAI_API_KEY` | Optional alias for the same `sk-` key |
 | `YOUTUBE_API_KEY` | `search.list` + `videos.list`. Required for a live Ideas feed |
 | `NEXT_PUBLIC_SUPABASE_URL` | Auth, profiles, caches, jobs, renders |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon key from Supabase → Settings → API |
@@ -36,10 +35,11 @@ npm run worker               # local render worker (needs yt-dlp + ffmpeg)
 
 ## Supabase SQL
 
-Paste both files in the SQL editor (safe to re-run), in order:
+Paste these in the SQL editor (safe to re-run), in order:
 
-1. [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql) — profiles, catalogs, caches, discovery, clip jobs
-2. [`supabase/migrations/002_renders.sql`](supabase/migrations/002_renders.sql) — `user_feed`, `clip_renders`, Whisper source, `clips` storage bucket
+1. [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql)
+2. [`supabase/migrations/002_renders.sql`](supabase/migrations/002_renders.sql)
+3. [`supabase/migrations/003_gameplay.sql`](supabase/migrations/003_gameplay.sql) — public `gameplay` bucket. Upload `minecraft.mp4`, `gta.mp4`, `subway.mp4` (your own / licensed loops).
 
 In the Supabase dashboard, set **Authentication → URL configuration**:
 
@@ -58,6 +58,8 @@ The Next.js app stays on Vercel. Export cannot run yt-dlp/ffmpeg there. Deploy `
 3. On Vercel, set `CLIP_WORKER_URL` to the Render URL (e.g. `https://clipmuse-worker.onrender.com`) and the same `CLIP_WORKER_SECRET`
 
 Free Render instances sleep. The first export after idle can take a minute; Studio polls Library until the mp4 is ready. The worker also drains queued jobs on boot.
+
+The worker also handles Studio transcribe (`POST /transcribe`) when Vercel cannot scrape YouTube captions. Redeploy Render after pulling this commit.
 
 Health check: `GET /health`.
 

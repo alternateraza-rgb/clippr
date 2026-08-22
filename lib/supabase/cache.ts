@@ -87,9 +87,7 @@ export async function readTranscriptCache(videoId: string): Promise<TranscriptRe
     .eq("video_id", videoId)
     .maybeSingle();
   if (!data) return null;
-  if (data.source === "none") {
-    return { segments: [], words: [], language: data.language || "en", source: "none" };
-  }
+  if (data.source === "none" || !(data.words ?? []).length) return null;
   const words = data.words ?? [];
   const segments = data.segments ?? [];
   if (!words.length) return null;
@@ -124,6 +122,10 @@ export async function readAnalysisCache(videoId: string): Promise<AnalysisResult
     .eq("rubric_version", RUBRIC_VERSION)
     .maybeSingle();
   if (!data?.candidates) return null;
+  const candidates = data.candidates as AnalysisResult["candidates"];
+  if (candidates[0]?.id === "nc-1" || candidates[0]?.hook?.startsWith("No transcript")) {
+    return null;
+  }
   const video = (data.video as VideoMeta | null) ?? (await readVideoCache(videoId));
   if (!video) return null;
   return {
