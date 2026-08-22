@@ -24,8 +24,10 @@ export async function GET() {
     worker: Boolean(workerUrl()),
     ingest: hasSupadata(),
     download: hasApify(),
-    workerApify: Boolean(health?.apify),
-    workerLlm: Boolean(health?.llm),
-    workerFfmpeg: Boolean(health?.ffmpeg),
+    workerReachable: Boolean(health?.ok),
+    workerApify: health?.apify === true,
+    workerApifyKnown: typeof health?.apify === "boolean",
+    workerLlm: health?.llm === true,
+    workerFfmpeg: health?.ffmpeg === true,
   });
 }

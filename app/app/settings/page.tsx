@@ -25,6 +25,8 @@ export default function SettingsPage() {
     ingest?: boolean;
     download?: boolean;
     workerApify?: boolean;
+    workerApifyKnown?: boolean;
+    workerReachable?: boolean;
     workerFfmpeg?: boolean;
   } | null>(null);
 
@@ -78,9 +80,13 @@ export default function SettingsPage() {
             <li>
               {connections.workerApify
                 ? "Render worker has Apify (cloud download)."
-                : connections.worker
+                : connections.workerApifyKnown
                   ? "Render worker is up, but APIFY_TOKEN is missing on that service."
-                  : "Set CLIP_WORKER_URL + CLIP_WORKER_SECRET for ffmpeg export."}
+                  : connections.workerReachable
+                    ? "Render worker is up. Redeploy the worker image so it can report APIFY_TOKEN."
+                    : connections.worker
+                      ? "Worker URL is set, but health timed out (Render may be waking)."
+                      : "Set CLIP_WORKER_URL + CLIP_WORKER_SECRET for ffmpeg export."}
             </li>
             <li>
               {connections.worker

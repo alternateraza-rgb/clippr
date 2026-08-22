@@ -50,6 +50,8 @@ function StudioInner() {
     ingest?: boolean;
     download?: boolean;
     workerApify?: boolean;
+    workerApifyKnown?: boolean;
+    workerReachable?: boolean;
   } | null>(null);
   const [captionSync, setCaptionSync] = useState<"idle" | "syncing" | "ready" | "error">("idle");
   const refined = useRef(new Map<string, ClipCandidate["captionLines"]>());
@@ -223,6 +225,8 @@ function StudioInner() {
         ingest?: boolean;
         download?: boolean;
         workerApify?: boolean;
+        workerApifyKnown?: boolean;
+        workerReachable?: boolean;
       }) => {
         setConnections({
           worker: Boolean(d.worker),
@@ -230,6 +234,8 @@ function StudioInner() {
           ingest: Boolean(d.ingest),
           download: Boolean(d.download),
           workerApify: Boolean(d.workerApify),
+          workerApifyKnown: Boolean(d.workerApifyKnown),
+          workerReachable: Boolean(d.workerReachable),
         });
       })
       .catch(() => null);
@@ -452,7 +458,7 @@ function StudioInner() {
             No LLM key. Set LLM_API_KEY or OPENAI_API_KEY so scoring is not a heuristic guess.
           </p>
         ) : null}
-        {phase === "idle" && connections && connections.worker && !connections.workerApify ? (
+        {phase === "idle" && connections && connections.worker && connections.workerApifyKnown && !connections.workerApify ? (
           <p className="mt-3 max-w-[46ch] text-[13px] text-warn">
             Render worker is up but APIFY_TOKEN is missing on that service. Export will fail until it is set.
           </p>
@@ -518,6 +524,7 @@ function StudioInner() {
               captionLines={selected.captionLines}
               preset={preset}
               gameplay={gameplay}
+              fallbackText={selected.hook || selected.whyItClips}
             />
             <div className="mt-5 rounded-[12px] bg-surface p-5 shadow-hairline">
               <ScoreBreakdown scores={selected.scores} />
