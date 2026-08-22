@@ -6,6 +6,14 @@ import type { AgentEvent, AgentStage, AnalysisResult, Niche } from "@/lib/agent/
 import { isDemoMode } from "@/lib/config";
 import { analysisFor } from "@/lib/fixtures/analyses";
 import { formatDuration } from "@/lib/format";
+import {
+  readAnalysisCache,
+  readTranscriptCache,
+  readVideoCache,
+  writeAnalysisCache,
+  writeTranscriptCache,
+  writeVideoCache,
+} from "@/lib/supabase/cache";
 import { hydrateVideo } from "@/lib/youtube/meta";
 
 export type StreamPacket =
@@ -35,21 +43,46 @@ export async function* runAnalysis(
   }
 
   try {
+    const persisted = await readAnalysisCache(videoId);
+    if (persisted) {
+      yield emit("resolve", "Cache hit — skipping the model");
+      yield emit("done", "Ready.");
+      yield { type: "result", analysis: persisted };
+      return;
+    }
+
     yield emit("resolve", "Resolving the video…");
-    const video = await hydrateVideo(videoId);
+    let video = await readVideoCache(videoId);
+    if (!video) {
+      video = await hydrateVideo(videoId);
+      await writeVideoCache(video);
+    }
     yield emit(
       "resolve",
       `Resolved · ${video.durationS ? formatDuration(video.durationS) : "live metadata"} · ${video.channel}`,
     );
 
     yield emit("transcribe", "Pulling captions…");
-    const transcript = await fetchTranscript(videoId).catch((error) => {
-      if (error instanceof CaptionsDisabledError) return null;
-      throw error;
-    });
-
+    let transcript = await readTranscriptCache(videoId);
     if (!transcript) {
+      transcript = await fetchTranscript(videoId).catch((error) => {
+        if (error instanceof CaptionsDisabledError) return null;
+        throw error;
+      });
+      if (transcript) await writeTranscriptCache(videoId, transcript);
+    }
+
+    if (!transcript || transcript.source === "none" || !transcript.words.length) {
       video.captionsAvailable = false;
+      await writeVideoCache(video);
+      if (!transcript || transcript.source !== "none") {
+        await writeTranscriptCache(videoId, {
+          segments: [],
+          words: [],
+          language: "en",
+          source: "none",
+        });
+      }
       yield emit("transcribe", "Captions are disabled on this video");
       yield emit("score", "Falling back to a chapter-less heuristic");
       yield emit("done", "Ready. No spoken captions.");
@@ -108,10 +141,14 @@ export async function* runAnalysis(
     yield emit("compose", `Composing ${filled.length} cuts · ${meta.source} · ${meta.ms}ms`);
     yield emit("done", filled.length ? "Ready." : "No strong cuts on this tape.");
 
-    yield {
-      type: "result",
-      analysis: { video, candidates: filled, events: [...events] },
-    };
+    const analysis: AnalysisResult = { video, candidates: filled, events: [...events] };
+    await writeAnalysisCache(videoId, analysis, {
+      niche,
+      model: meta.model,
+      source: meta.source,
+      tokens: meta.tokens,
+    });
+    yield { type: "result", analysis };
   } catch (error) {
     yield {
       type: "error",

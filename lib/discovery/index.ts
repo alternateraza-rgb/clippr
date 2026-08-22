@@ -1,6 +1,7 @@
 import type { DiscoveryItem, Niche } from "@/lib/agent/types";
 import { hasYouTubeKey } from "@/lib/config";
 import { createClient } from "@/lib/supabase/server";
+import { writeVideoCache } from "@/lib/supabase/cache";
 import { hydrateVideos, searchLongform } from "@/lib/youtube/meta";
 
 export const NICHE_QUERIES: Record<Niche, string> = {
@@ -47,6 +48,7 @@ export async function refreshDiscovery(niches: Niche[]) {
     if (!hits.length) continue;
     const videos = await hydrateVideos(hits.map((h) => h.videoId));
     for (const video of videos) {
+      await writeVideoCache(video);
       const hook = video.title.split(/[|:–—]/)[0]?.trim() || video.title;
       const score = Math.min(92, 58 + Math.min(video.durationS / 600, 20));
       const row: DiscoveryItem = {

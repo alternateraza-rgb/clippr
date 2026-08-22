@@ -25,7 +25,11 @@ npm run spike                # prove transcript + scoring on real videos
 | `ENABLE_LOCAL_EXPORT` | `true` to render mp4 via yt-dlp + ffmpeg |
 | `CLIPMUSE_MODE` | `demo` forces fixtures; `live` is default |
 
-Apply [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql) in the Supabase SQL editor.
+Apply the complete A–Z schema in the Supabase SQL editor (safe to re-run):
+
+[`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql)
+
+That file creates every table this app uses — profiles, niche/format catalogs, video/transcript/analysis caches, discovery feed + quota, and clip jobs — plus indexes, RLS, grants, and the auth trigger that inserts a profile on signup.
 
 Refresh today's Ideas feed (uses ~1 search per niche, capped at 80/day):
 
