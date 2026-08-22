@@ -8,6 +8,7 @@ import type { CaptionLine, CaptionPreset, RenderStatus } from "../../lib/agent/t
 import { buildAss } from "./ass";
 import { run } from "./exec";
 import { transcribeFile } from "./whisper";
+import { downloadYoutubeViaApify } from "../../lib/ingest/apify";
 
 type RenderRow = {
   id: string;
@@ -81,42 +82,88 @@ export async function processRender(renderId: string) {
 
   try {
     await setStatus(renderId, { status: "downloading", progress: 8, error: null });
-    const section = `*${start.toFixed(2)}-${end.toFixed(2)}`;
+    const duration = Math.max(1, end - start);
+    const apifyFile = join(dir, "full.mp4");
+    const clip = join(dir, "raw.mp4");
+    let raw = "";
     try {
-      await run("yt-dlp", [
-        "--no-playlist",
-        "--no-warnings",
-        "--force-overwrites",
-        "--merge-output-format",
-        "mp4",
-        "--force-keyframes-at-cuts",
-        "--download-sections",
-        section,
-        "--extractor-args",
-        "youtube:player_client=android,web",
-        "-f",
-        "bv*[height<=720]+ba/b[height<=720]/b",
-        "-o",
-        join(dir, "raw.%(ext)s"),
-        youtubeUrl(row.video_id),
-      ]);
-    } catch {
-      await run("yt-dlp", [
-        "--no-playlist",
-        "--force-overwrites",
-        "--merge-output-format",
-        "mp4",
-        "--force-keyframes-at-cuts",
-        "--download-sections",
-        section,
-        "-f",
-        "b[height<=720]/b",
-        "-o",
-        join(dir, "raw.%(ext)s"),
-        youtubeUrl(row.video_id),
-      ]);
+      if (await downloadYoutubeViaApify(row.video_id, apifyFile, "video")) {
+        try {
+          await run("ffmpeg", [
+            "-y",
+            "-ss",
+            start.toFixed(2),
+            "-i",
+            apifyFile,
+            "-t",
+            duration.toFixed(2),
+            "-c",
+            "copy",
+            "-movflags",
+            "+faststart",
+            clip,
+          ]);
+        } catch {
+          await run("ffmpeg", [
+            "-y",
+            "-ss",
+            start.toFixed(2),
+            "-i",
+            apifyFile,
+            "-t",
+            duration.toFixed(2),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-c:a",
+            "aac",
+            clip,
+          ]);
+        }
+        raw = clip;
+      }
+    } catch (error) {
+      console.error("[worker] apify video failed, falling back to yt-dlp", error);
     }
-    const raw = await findMedia(dir);
+    if (!raw) {
+      const section = `*${start.toFixed(2)}-${end.toFixed(2)}`;
+      try {
+        await run("yt-dlp", [
+          "--no-playlist",
+          "--no-warnings",
+          "--force-overwrites",
+          "--merge-output-format",
+          "mp4",
+          "--force-keyframes-at-cuts",
+          "--download-sections",
+          section,
+          "--extractor-args",
+          "youtube:player_client=android,web",
+          "-f",
+          "bv*[height<=720]+ba/b[height<=720]/b",
+          "-o",
+          join(dir, "raw.%(ext)s"),
+          youtubeUrl(row.video_id),
+        ]);
+      } catch {
+        await run("yt-dlp", [
+          "--no-playlist",
+          "--force-overwrites",
+          "--merge-output-format",
+          "mp4",
+          "--force-keyframes-at-cuts",
+          "--download-sections",
+          section,
+          "-f",
+          "b[height<=720]/b",
+          "-o",
+          join(dir, "raw.%(ext)s"),
+          youtubeUrl(row.video_id),
+        ]);
+      }
+      raw = await findMedia(dir);
+    }
 
     await setStatus(renderId, { status: "transcribing", progress: 35 });
     const audio = join(dir, "audio.mp3");
@@ -150,7 +197,6 @@ export async function processRender(renderId: string) {
       : "";
     const assFilter = `ass=${assPath.replace(/\\/g, "/").replace(/:/g, "\\:")}${fontsDir}`;
     const gameplayFile = await fetchGameplayLoop(dir, row.gameplay, admin);
-    const duration = Math.max(1, end - start);
 
     const vf = gameplayFile
       ? [

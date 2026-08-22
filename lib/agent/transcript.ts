@@ -16,7 +16,7 @@ export type TranscriptResult = {
   title?: string;
 };
 
-function explodeWords(segments: TranscriptSegment[]): WordTiming[] {
+export function explodeWords(segments: TranscriptSegment[]): WordTiming[] {
   const words: WordTiming[] = [];
   for (const seg of segments) {
     const tokens = seg.text

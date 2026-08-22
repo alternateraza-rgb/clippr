@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAdminClient } from "../../lib/supabase/admin";
 import { upsertTranscribeJob } from "../../lib/supabase/jobs";
+import { downloadYoutubeViaApify } from "../../lib/ingest/apify";
+import { fetchSupadataTranscript } from "../../lib/ingest/supadata";
 import type { TranscriptResult } from "../../lib/agent/transcript";
 import { run } from "./exec";
 import { explodeWords, parseVtt, segmentsFromWords } from "./vtt";
@@ -58,8 +60,28 @@ async function trySubs(dir: string, videoId: string): Promise<TranscriptResult |
   return { segments, words, language: "en", source: "captions" };
 }
 
+async function whisperFromFile(audio: string): Promise<TranscriptResult> {
+  const result = await transcribeFile(audio);
+  if (!result.words.length) throw new Error("Whisper returned no words");
+  return {
+    segments: segmentsFromWords(result.words),
+    words: result.words,
+    language: result.language || "en",
+    source: "whisper",
+  };
+}
+
 async function whisperWindow(dir: string, videoId: string): Promise<TranscriptResult> {
   const audio = join(dir, "audio.mp3");
+  const apifyAudio = join(dir, "audio.m4a");
+  try {
+    if (await downloadYoutubeViaApify(videoId, apifyAudio, "audio")) {
+      await run("ffmpeg", ["-y", "-i", apifyAudio, "-t", String(AUDIO_CAP_S), "-ac", "1", "-ar", "16000", "-b:a", "64k", audio]);
+      return whisperFromFile(audio);
+    }
+  } catch (error) {
+    console.error("[worker] apify audio failed, falling back to yt-dlp", error);
+  }
   await run("yt-dlp", [
     "--no-playlist",
     "--no-warnings",
@@ -78,14 +100,7 @@ async function whisperWindow(dir: string, videoId: string): Promise<TranscriptRe
     audio,
     youtubeUrl(videoId),
   ]);
-  const result = await transcribeFile(audio);
-  if (!result.words.length) throw new Error("Whisper returned no words");
-  return {
-    segments: segmentsFromWords(result.words),
-    words: result.words,
-    language: result.language || "en",
-    source: "whisper",
-  };
+  return whisperFromFile(audio);
 }
 
 export async function processTranscribe(videoId: string) {
@@ -94,6 +109,17 @@ export async function processTranscribe(videoId: string) {
   const dir = join(tmpdir(), "clipmuse-transcribe", videoId);
   await mkdir(dir, { recursive: true });
   try {
+    const cloud = await fetchSupadataTranscript(videoId);
+    if (cloud?.words.length) {
+      await writeCache(videoId, cloud);
+      await upsertTranscribeJob({
+        videoId,
+        status: "ready",
+        source: cloud.source === "whisper" ? "whisper" : "captions",
+        wordCount: cloud.words.length,
+      });
+      return { ok: true, source: cloud.source, words: cloud.words.length };
+    }
     const fromSubs = await trySubs(dir, videoId);
     const transcript = fromSubs ?? (await whisperWindow(dir, videoId));
     await writeCache(videoId, transcript);

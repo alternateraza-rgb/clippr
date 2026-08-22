@@ -3,9 +3,10 @@ import { heuristicCandidates } from "@/lib/agent/heuristic";
 import { scoreTranscript } from "@/lib/agent/score";
 import { CaptionsDisabledError, fetchTranscript } from "@/lib/agent/transcript";
 import type { AgentEvent, AgentStage, AnalysisResult, Niche } from "@/lib/agent/types";
-import { isDemoMode, workerUrl } from "@/lib/config";
+import { isDemoMode, workerUrl, hasSupadata } from "@/lib/config";
 import { analysisFor } from "@/lib/fixtures/analyses";
 import { formatDuration } from "@/lib/format";
+import { fetchSupadataTranscript } from "@/lib/ingest/supadata";
 import {
   readAnalysisCache,
   readTranscriptCache,
@@ -94,6 +95,12 @@ export async function* runAnalysis(
       if (transcript?.words.length) await writeTranscriptCache(videoId, transcript);
     }
 
+    if (!transcript?.words.length && hasSupadata()) {
+      yield emit("transcribe", "Fetching transcript in the cloud (Supadata)…");
+      transcript = await fetchSupadataTranscript(videoId);
+      if (transcript?.words.length) await writeTranscriptCache(videoId, transcript);
+    }
+
     if (!transcript?.words.length && workerUrl()) {
       yield emit("transcribe", "No captions on Vercel — sending audio to the worker…");
       const ping = await requestTranscribe(videoId, 20_000);
@@ -112,17 +119,19 @@ export async function* runAnalysis(
     }
 
     if (!transcript?.words.length) {
-      if (!workerUrl()) {
+      if (workerUrl()) {
+        yield emit("transcribe", "Still transcribing on the worker. Studio will wait…");
         yield {
-          type: "error",
-          message: "Could not get captions, and CLIP_WORKER_URL is not set.",
+          type: "pending",
+          message: "Worker is transcribing. This can take a few minutes.",
         };
         return;
       }
-      yield emit("transcribe", "Still transcribing on Render. Studio will wait for Whisper…");
       yield {
-        type: "pending",
-        message: "Worker is transcribing the first 10 minutes. This can take a few minutes after Render wakes.",
+        type: "error",
+        message: hasSupadata()
+          ? "Supadata could not return a transcript for this video. Check credits and that the video is public."
+          : "Could not get captions. Set SUPADATA_API_KEY (cloud) on Vercel.",
       };
       return;
     }

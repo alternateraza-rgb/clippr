@@ -22,6 +22,8 @@ export default function SettingsPage() {
     worker?: boolean;
     liveFeed?: boolean;
     authEnabled?: boolean;
+    ingest?: boolean;
+    download?: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -62,9 +64,19 @@ export default function SettingsPage() {
                 : "Set YOUTUBE_API_KEY for a live Ideas feed."}
             </li>
             <li>
+              {connections.ingest
+                ? "Supadata is on (cloud transcripts)."
+                : "Set SUPADATA_API_KEY for cloud transcripts (no home PC)."}
+            </li>
+            <li>
+              {connections.download
+                ? "Apify is on (cloud YouTube download)."
+                : "Set APIFY_TOKEN so export does not hit YouTube from Render."}
+            </li>
+            <li>
               {connections.worker
                 ? "Render worker URL is set."
-                : "Set CLIP_WORKER_URL + CLIP_WORKER_SECRET (same secret on Render)."}
+                : "Set CLIP_WORKER_URL + CLIP_WORKER_SECRET for ffmpeg export."}
             </li>
             <li>
               {connections.liveFeed

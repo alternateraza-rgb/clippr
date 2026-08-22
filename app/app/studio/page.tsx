@@ -44,7 +44,12 @@ function StudioInner() {
   const [saved, setSaved] = useState(false);
   const [exportMsg, setExportMsg] = useState("");
   const [exporting, setExporting] = useState(false);
-  const [connections, setConnections] = useState<{ worker: boolean; llm: boolean } | null>(null);
+  const [connections, setConnections] = useState<{
+    worker: boolean;
+    llm: boolean;
+    ingest?: boolean;
+    download?: boolean;
+  } | null>(null);
 
   const videoId = parseYouTubeId(raw);
 
@@ -203,8 +208,13 @@ function StudioInner() {
   useEffect(() => {
     fetch("/api/config")
       .then((r) => r.json())
-      .then((d: { worker?: boolean; llm?: boolean }) => {
-        setConnections({ worker: Boolean(d.worker), llm: Boolean(d.llm) });
+      .then((d: { worker?: boolean; llm?: boolean; ingest?: boolean; download?: boolean }) => {
+        setConnections({
+          worker: Boolean(d.worker),
+          llm: Boolean(d.llm),
+          ingest: Boolean(d.ingest),
+          download: Boolean(d.download),
+        });
       })
       .catch(() => null);
   }, []);
@@ -366,14 +376,13 @@ function StudioInner() {
 
         {phase === "idle" ? (
           <p className="mt-16 max-w-[40ch] text-body">
-            Paste a longform YouTube link (8+ minutes). If YouTube blocks captions
-            on Vercel, the Render worker transcribes the first 10 minutes, then
-            OpenAI picks the clip.
+            Paste a longform YouTube link (8+ minutes). Transcripts come from
+            Supadata in the cloud; export downloads via Apify, then Render burns captions.
           </p>
         ) : null}
-        {phase === "idle" && connections && !connections.worker ? (
+        {phase === "idle" && connections && !connections.ingest ? (
           <p className="mt-4 max-w-[46ch] text-[13px] text-warn">
-            CLIP_WORKER_URL is not set. Studio cannot Whisper when YouTube blocks captions.
+            SUPADATA_API_KEY is not set. Studio cannot pull cloud transcripts when YouTube blocks Vercel.
           </p>
         ) : null}
         {phase === "idle" && connections && !connections.llm ? (

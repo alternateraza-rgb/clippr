@@ -1,6 +1,6 @@
 # Clipmuse
 
-Premium clipping studio. Paste a YouTube URL; the agent reads the transcript, scores high-retention moments, and previews a captioned 9:16 cut. Home/Ideas are live YouTube longform ranked by OpenAI. Export burns captions into an mp4 on the worker (run it on your PC so YouTube is not blocked).
+Premium clipping studio. Paste a YouTube URL; the agent reads the transcript, scores high-retention moments, and previews a captioned 9:16 cut. Home/Ideas are live YouTube longform ranked by OpenAI. Transcripts come from Supadata; export downloads via Apify, then Render burns captions.
 
 ```bash
 cp .env.example .env.local
@@ -28,21 +28,24 @@ npm run worker               # local render worker (needs yt-dlp + ffmpeg)
 | `SUPABASE_URL` | Same project URL; worker can use this instead of the `NEXT_PUBLIC_` key |
 | `NEXT_PUBLIC_SITE_URL` | Canonical origin for auth email links |
 | `CRON_SECRET` | If set, `/api/discovery/refresh` requires `Authorization: Bearer …` (Vercel Cron sends this) |
-| `CLIP_WORKER_URL` | Public URL of the **home** worker tunnel (or Render). No trailing slash |
+| `CLIP_WORKER_URL` | Public URL of the Render worker (ffmpeg). No trailing slash |
 | `CLIP_WORKER_SECRET` | Shared secret. Same value on Vercel and the worker |
+| `SUPADATA_API_KEY` | Cloud transcripts when Vercel cannot scrape YouTube. [supadata.ai](https://supadata.ai) |
+| `APIFY_TOKEN` | Cloud YouTube file download for export. [Apify console](https://console.apify.com/settings/integrations) |
 | `ENABLE_LOCAL_EXPORT` | `true` to render an mp4 on this machine when the worker is not configured |
 | `CLIPMUSE_MODE` | `demo` forces fixtures; `live` is default |
 
-## Home worker (YouTube download)
+## Cloud YouTube (no home PC)
 
-YouTube blocks yt-dlp on Render. Run the worker on your PC and point Vercel at a tunnel. Users still only paste a link on the site. Full steps: [`docs/LOCAL_WORKER.md`](docs/LOCAL_WORKER.md).
+Users only paste a link. YouTube is never fetched from Vercel/Render IPs.
 
-```bash
-npm run worker          # terminal 1 — needs yt-dlp + ffmpeg
-npm run worker:tunnel   # terminal 2 — prints an https URL
-```
+1. Create a [Supadata](https://dash.supadata.ai/organizations/api-key) key → Vercel `SUPADATA_API_KEY` (Studio scoring). Free tier is 100 credits/month; paid from $5.
+2. Create an [Apify](https://console.apify.com/settings/integrations) token → Vercel **and** Render `APIFY_TOKEN` (file download). Actor `datapipe/youtube-video-downloader`. Budget roughly tens of cents per export (proxy bandwidth).
+3. Keep the Render worker for ffmpeg only. Redeploy both after setting keys.
 
-Set Vercel `CLIP_WORKER_URL` to that URL and pause Render.
+## Home worker (optional fallback)
+
+If you skip Apify, you can still run yt-dlp on your PC. [`docs/LOCAL_WORKER.md`](docs/LOCAL_WORKER.md).
 
 ## Supabase SQL
 
@@ -61,11 +64,9 @@ In the Supabase dashboard, set **Authentication → URL configuration**:
 
 Use the same host everywhere (`127.0.0.1` vs `localhost`). Mixing them drops the session cookie.
 
-## Render worker (optional)
+## Render worker
 
-Do **not** use Render for YouTube download (bot check). Pause that service while the home worker is on. The Docker worker is still in `worker/Dockerfile` if you later run ffmpeg-only jobs on files already in Storage.
-
-Health check: `GET /health`.
+Keep Render for **ffmpeg only**. Set `APIFY_TOKEN` (and optionally `SUPADATA_API_KEY`) on that service so it never calls youtube.com. Health check: `GET /health`.
 
 ## Discovery
 

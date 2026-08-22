@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import "../../lib/load-env";
-import { env, hasLlm, hasServiceRole, workerSecret } from "../../lib/config";
+import { env, hasApify, hasLlm, hasServiceRole, hasSupadata, workerSecret } from "../../lib/config";
 import { upsertTranscribeJob } from "../../lib/supabase/jobs";
 import { drainQueued, processRender } from "./render";
 import { processTranscribe } from "./transcribe";
@@ -158,7 +158,7 @@ server.listen(PORT, HOST, () => {
   const secret = Boolean(workerSecret());
   console.info(`[worker] listening on ${HOST}:${PORT}`);
   console.info(
-    `[worker] secret=${secret ? "set" : "MISSING"} supabase=${hasServiceRole() ? "set" : "MISSING"} llm=${hasLlm() ? "set" : "MISSING"}`,
+    `[worker] secret=${secret ? "set" : "MISSING"} supabase=${hasServiceRole() ? "set" : "MISSING"} llm=${hasLlm() ? "set" : "MISSING"} supadata=${hasSupadata() ? "set" : "no"} apify=${hasApify() ? "set" : "no"}`,
   );
   drainQueued()
     .then((ids) => ids.forEach(enqueue))

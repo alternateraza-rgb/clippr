@@ -40,6 +40,14 @@ export function workerSecret() {
   return env("CLIP_WORKER_SECRET");
 }
 
+export function hasSupadata() {
+  return Boolean(env("SUPADATA_API_KEY"));
+}
+
+export function hasApify() {
+  return Boolean(env("APIFY_TOKEN"));
+}
+
 export function llmProvider() {
   return (env("LLM_PROVIDER") || "openai").toLowerCase();
 }
