@@ -26,7 +26,10 @@ export async function completeJson(input: {
         messages: [{ role: "user", content: input.user }],
       }),
     });
-    if (!res.ok) throw new Error(`Anthropic ${res.status}`);
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      throw new Error(`Anthropic ${res.status}${detail ? `: ${detail.slice(0, 180)}` : ""}`);
+    }
     const data = (await res.json()) as {
       content?: Array<{ text?: string }>;
       usage?: { input_tokens?: number; output_tokens?: number };
@@ -56,7 +59,10 @@ export async function completeJson(input: {
       ],
     }),
   });
-  if (!res.ok) throw new Error(`OpenAI ${res.status}`);
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`OpenAI ${res.status}${detail ? `: ${detail.slice(0, 180)}` : ""}`);
+  }
   const data = (await res.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
     usage?: { total_tokens?: number };

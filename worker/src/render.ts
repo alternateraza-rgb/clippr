@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,7 +8,7 @@ import type { CaptionLine, CaptionPreset, RenderStatus } from "../../lib/agent/t
 import { buildAss } from "./ass";
 import { run } from "./exec";
 import { transcribeFile } from "./whisper";
-import { downloadYoutubeViaApify } from "../../lib/ingest/apify";
+import { cutReencode, downloadSource } from "./media";
 
 type RenderRow = {
   id: string;
@@ -39,17 +39,6 @@ async function setStatus(
   if (!admin) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
   const { error } = await admin.from("clip_renders").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
-}
-
-function youtubeUrl(videoId: string) {
-  return `https://www.youtube.com/watch?v=${videoId}`;
-}
-
-async function findMedia(dir: string) {
-  const files = await readdir(dir);
-  const hit = files.find((f) => /\.(mp4|mkv|webm|mov)$/i.test(f));
-  if (!hit) throw new Error("yt-dlp produced no video file");
-  return join(dir, hit);
 }
 
 async function fetchGameplayLoop(
@@ -84,86 +73,9 @@ export async function processRender(renderId: string) {
     await setStatus(renderId, { status: "downloading", progress: 8, error: null });
     const duration = Math.max(1, end - start);
     const apifyFile = join(dir, "full.mp4");
-    const clip = join(dir, "raw.mp4");
-    let raw = "";
-    try {
-      if (await downloadYoutubeViaApify(row.video_id, apifyFile, "video")) {
-        try {
-          await run("ffmpeg", [
-            "-y",
-            "-ss",
-            start.toFixed(2),
-            "-i",
-            apifyFile,
-            "-t",
-            duration.toFixed(2),
-            "-c",
-            "copy",
-            "-movflags",
-            "+faststart",
-            clip,
-          ]);
-        } catch {
-          await run("ffmpeg", [
-            "-y",
-            "-ss",
-            start.toFixed(2),
-            "-i",
-            apifyFile,
-            "-t",
-            duration.toFixed(2),
-            "-c:v",
-            "libx264",
-            "-preset",
-            "ultrafast",
-            "-c:a",
-            "aac",
-            clip,
-          ]);
-        }
-        raw = clip;
-      }
-    } catch (error) {
-      console.error("[worker] apify video failed, falling back to yt-dlp", error);
-    }
-    if (!raw) {
-      const section = `*${start.toFixed(2)}-${end.toFixed(2)}`;
-      try {
-        await run("yt-dlp", [
-          "--no-playlist",
-          "--no-warnings",
-          "--force-overwrites",
-          "--merge-output-format",
-          "mp4",
-          "--force-keyframes-at-cuts",
-          "--download-sections",
-          section,
-          "--extractor-args",
-          "youtube:player_client=android,web",
-          "-f",
-          "bv*[height<=720]+ba/b[height<=720]/b",
-          "-o",
-          join(dir, "raw.%(ext)s"),
-          youtubeUrl(row.video_id),
-        ]);
-      } catch {
-        await run("yt-dlp", [
-          "--no-playlist",
-          "--force-overwrites",
-          "--merge-output-format",
-          "mp4",
-          "--force-keyframes-at-cuts",
-          "--download-sections",
-          section,
-          "-f",
-          "b[height<=720]/b",
-          "-o",
-          join(dir, "raw.%(ext)s"),
-          youtubeUrl(row.video_id),
-        ]);
-      }
-      raw = await findMedia(dir);
-    }
+    const raw = join(dir, "raw.mp4");
+    await downloadSource(row.video_id, apifyFile, "video");
+    await cutReencode(apifyFile, raw, start, duration, "video");
 
     await setStatus(renderId, { status: "transcribing", progress: 35 });
     const audio = join(dir, "audio.mp3");
@@ -192,9 +104,11 @@ export async function processRender(renderId: string) {
     const assPath = join(dir, "captions.ass");
     await writeFile(assPath, buildAss(lines, row.caption_preset ?? "hormozi"), "utf8");
     const out = join(dir, "out.mp4");
-    const fontsDir = existsSync("/usr/share/fonts/truetype/liberation")
-      ? ":fontsdir=/usr/share/fonts/truetype/liberation"
-      : "";
+    const fontsDir = existsSync("/usr/share/fonts/truetype/clipmuse")
+      ? ":fontsdir=/usr/share/fonts/truetype/clipmuse"
+      : existsSync("/usr/share/fonts/truetype/liberation")
+        ? ":fontsdir=/usr/share/fonts/truetype/liberation"
+        : "";
     const assFilter = `ass=${assPath.replace(/\\/g, "/").replace(/:/g, "\\:")}${fontsDir}`;
     const gameplayFile = await fetchGameplayLoop(dir, row.gameplay, admin);
 

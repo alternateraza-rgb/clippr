@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Instrument_Serif, Inter_Tight } from "next/font/google";
+import { Anton, Geist, Instrument_Serif, Inter_Tight } from "next/font/google";
 import { SessionHydrator } from "@/components/app/SessionHydrator";
 import { JobsProvider } from "@/lib/store/jobs";
 import { ProfileProvider } from "@/lib/store/profile";
@@ -23,6 +23,12 @@ const serif = Instrument_Serif({
   style: "italic",
 });
 
+const caption = Anton({
+  variable: "--font-anton",
+  subsets: ["latin"],
+  weight: "400",
+});
+
 export const metadata: Metadata = {
   title: "Clipmuse — Make $10,000/month using AI clipping",
   description:
@@ -37,7 +43,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geist.variable} ${instrument.variable} ${serif.variable} h-full antialiased`}
+      className={`${geist.variable} ${instrument.variable} ${serif.variable} ${caption.variable} h-full antialiased`}
     >
       <body className="grain min-h-full bg-canvas text-ink">
         <ProfileProvider>

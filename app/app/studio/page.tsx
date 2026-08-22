@@ -49,7 +49,10 @@ function StudioInner() {
     llm: boolean;
     ingest?: boolean;
     download?: boolean;
+    workerApify?: boolean;
   } | null>(null);
+  const [captionSync, setCaptionSync] = useState<"idle" | "syncing" | "ready" | "error">("idle");
+  const refined = useRef(new Map<string, ClipCandidate["captionLines"]>());
 
   const videoId = parseYouTubeId(raw);
 
@@ -64,11 +67,15 @@ function StudioInner() {
     });
   }
 
-  async function consumeAnalyze(id: string, controller: AbortController): Promise<"result" | "pending"> {
+  async function consumeAnalyze(
+    id: string,
+    controller: AbortController,
+    refresh = false,
+  ): Promise<"result" | "pending"> {
     const res = await fetch("/api/studio/analyze", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ videoId: id, niche: profile.niche }),
+      body: JSON.stringify({ videoId: id, niche: profile.niche, refresh }),
       signal: controller.signal,
     });
     if (!res.ok || !res.body) {
@@ -163,7 +170,7 @@ function StudioInner() {
     throw new Error("Transcript timed out. Check CLIP_WORKER_URL and Render logs.");
   }
 
-  async function start(id: string) {
+  async function start(id: string, refresh = false) {
     abort.current?.abort();
     const controller = new AbortController();
     abort.current = controller;
@@ -172,14 +179,16 @@ function StudioInner() {
     setSaved(false);
     setExportMsg("");
     setEvents([]);
+    setCaptionSync("idle");
+    if (refresh) refined.current.clear();
     setPhase("running");
     setError("");
 
     try {
-      const first = await consumeAnalyze(id, controller);
+      const first = await consumeAnalyze(id, controller, refresh);
       if (first === "pending") {
         await waitForWorkerTranscript(id, controller);
-        await consumeAnalyze(id, controller);
+        await consumeAnalyze(id, controller, refresh);
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
@@ -208,16 +217,69 @@ function StudioInner() {
   useEffect(() => {
     fetch("/api/config")
       .then((r) => r.json())
-      .then((d: { worker?: boolean; llm?: boolean; ingest?: boolean; download?: boolean }) => {
+      .then((d: {
+        worker?: boolean;
+        llm?: boolean;
+        ingest?: boolean;
+        download?: boolean;
+        workerApify?: boolean;
+      }) => {
         setConnections({
           worker: Boolean(d.worker),
           llm: Boolean(d.llm),
           ingest: Boolean(d.ingest),
           download: Boolean(d.download),
+          workerApify: Boolean(d.workerApify),
         });
       })
       .catch(() => null);
   }, []);
+
+  useEffect(() => {
+    if (!selected || !videoId || phase !== "results") return;
+    const key = `${videoId}:${selected.start.toFixed(2)}:${selected.end.toFixed(2)}`;
+    const hit = refined.current.get(key);
+    if (hit?.length) {
+      setSelected((prev) => (prev && prev.id === selected.id ? { ...prev, captionLines: hit } : prev));
+      setCaptionSync("ready");
+      return;
+    }
+    let cancelled = false;
+    setCaptionSync("syncing");
+    fetch("/api/studio/refine", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ videoId, start: selected.start, end: selected.end }),
+    })
+      .then(async (res) => {
+        const data = (await res.json()) as { captionLines?: ClipCandidate["captionLines"]; message?: string };
+        if (!res.ok || !data.captionLines?.length) throw new Error(data.message || "Caption sync failed");
+        return data.captionLines;
+      })
+      .then((lines) => {
+        if (cancelled) return;
+        refined.current.set(key, lines);
+        setAnalysis((prev) =>
+          prev
+            ? {
+                ...prev,
+                candidates: prev.candidates.map((c) =>
+                  c.start === selected.start && c.end === selected.end ? { ...c, captionLines: lines } : c,
+                ),
+              }
+            : prev,
+        );
+        setSelected((prev) => (prev && prev.id === selected.id ? { ...prev, captionLines: lines } : prev));
+        setCaptionSync("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setCaptionSync("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, videoId, selected?.id, selected?.start, selected?.end]);
 
   const noCaptions = Boolean(analysis && selected && selected.captionLines.length === 0);
 
@@ -390,6 +452,11 @@ function StudioInner() {
             No LLM key. Set LLM_API_KEY or OPENAI_API_KEY so scoring is not a heuristic guess.
           </p>
         ) : null}
+        {phase === "idle" && connections && connections.worker && !connections.workerApify ? (
+          <p className="mt-3 max-w-[46ch] text-[13px] text-warn">
+            Render worker is up but APIFY_TOKEN is missing on that service. Export will fail until it is set.
+          </p>
+        ) : null}
 
         {phase === "running" ? (
           <div className="mt-10 max-w-[520px] rounded-[12px] bg-surface p-6 shadow-hairline">
@@ -399,6 +466,18 @@ function StudioInner() {
 
         {phase === "results" && analysis ? (
           <div className="mt-10 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-surface-warm px-3 py-1 text-[12px] text-muted">
+                {analysis.scoreSource === "llm" ? "Scored by LLM" : "Heuristic score"}
+              </span>
+              <button
+                type="button"
+                className="text-[12px] text-brand underline-offset-4 hover:underline"
+                onClick={() => videoId && start(videoId, true)}
+              >
+                Re-score with LLM
+              </button>
+            </div>
             {analysis.candidates.map((c) => (
               <button
                 key={c.id}
@@ -451,7 +530,12 @@ function StudioInner() {
                 </Pill>
               </div>
               <p className="mt-3 text-[12px] text-muted">
-                {exportMsg || "Export burns captions into a 9:16 mp4 on the worker."}
+                {exportMsg ||
+                  (captionSync === "syncing"
+                    ? "Syncing captions to speech…"
+                    : captionSync === "error"
+                      ? "Using coarse captions until Whisper can refine this window."
+                      : "Export burns captions into a 9:16 mp4 on the worker.")}
               </p>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { RUBRIC_VERSION } from "@/lib/config";
+import { RUBRIC_VERSION, hasLlm } from "@/lib/config";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -126,12 +126,17 @@ export async function readAnalysisCache(videoId: string): Promise<AnalysisResult
   if (candidates[0]?.id === "nc-1" || candidates[0]?.hook?.startsWith("No transcript")) {
     return null;
   }
+  const source = data.source === "llm" || data.source === "heuristic" ? data.source : null;
+  if (hasLlm() && (source === "heuristic" || candidates[0]?.id?.startsWith("h-"))) {
+    return null;
+  }
   const video = (data.video as VideoMeta | null) ?? (await readVideoCache(videoId));
   if (!video) return null;
   return {
     video,
     candidates: data.candidates,
     events: data.events ?? [],
+    scoreSource: source ?? undefined,
   };
 }
 

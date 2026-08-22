@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAdminClient } from "../../lib/supabase/admin";
 import { upsertTranscribeJob } from "../../lib/supabase/jobs";
-import { downloadYoutubeViaApify } from "../../lib/ingest/apify";
+import { downloadSource } from "./media";
 import { fetchSupadataTranscript } from "../../lib/ingest/supadata";
 import type { TranscriptResult } from "../../lib/agent/transcript";
 import { run } from "./exec";
@@ -74,31 +74,20 @@ async function whisperFromFile(audio: string): Promise<TranscriptResult> {
 async function whisperWindow(dir: string, videoId: string): Promise<TranscriptResult> {
   const audio = join(dir, "audio.mp3");
   const apifyAudio = join(dir, "audio.m4a");
-  try {
-    if (await downloadYoutubeViaApify(videoId, apifyAudio, "audio")) {
-      await run("ffmpeg", ["-y", "-i", apifyAudio, "-t", String(AUDIO_CAP_S), "-ac", "1", "-ar", "16000", "-b:a", "64k", audio]);
-      return whisperFromFile(audio);
-    }
-  } catch (error) {
-    console.error("[worker] apify audio failed, falling back to yt-dlp", error);
-  }
-  await run("yt-dlp", [
-    "--no-playlist",
-    "--no-warnings",
-    "--force-overwrites",
-    "-x",
-    "--audio-format",
-    "mp3",
-    "--audio-quality",
-    "7",
-    "--download-sections",
-    `*0-${AUDIO_CAP_S}`,
-    "--force-keyframes-at-cuts",
-    "--extractor-args",
-    "youtube:player_client=android,web",
-    "-o",
+  await downloadSource(videoId, apifyAudio, "audio");
+  await run("ffmpeg", [
+    "-y",
+    "-i",
+    apifyAudio,
+    "-t",
+    String(AUDIO_CAP_S),
+    "-ac",
+    "1",
+    "-ar",
+    "16000",
+    "-b:a",
+    "64k",
     audio,
-    youtubeUrl(videoId),
   ]);
   return whisperFromFile(audio);
 }
