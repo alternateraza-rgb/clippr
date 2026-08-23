@@ -1,7 +1,7 @@
 import { mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import { hasApify, ytdlpFirst, ytdlpProxy } from "../../lib/config";
 import { downloadYoutubeViaApify } from "../../lib/ingest/apify";
-import { cookieArgs, isBlockError, ytdlpBaseArgs } from "../../lib/ingest/ytdlp";
+import { cookieArgs, isBlockError, isTransientError, ytdlpBaseArgs } from "../../lib/ingest/ytdlp";
 import { run } from "./exec";
 
 let ytdlpAvailable: boolean | null = null;
@@ -98,9 +98,18 @@ async function pickOutput(dir: string) {
 }
 
 /**
- * A rotating residential endpoint hands out a different exit IP on reconnect,
- * so a block is often survivable by simply trying again. Bounded hard: every
- * retry costs bandwidth and wall time, and renders are already queued.
+ * A dead exit node is always worth another attempt; a block is only worth one
+ * behind a rotating proxy, where the retry comes from a different IP. Retrying
+ * a block on a fixed IP just fails again more slowly.
+ */
+function worthRetrying(error: unknown) {
+  if (isTransientError(error)) return true;
+  return isBlockError(error) && Boolean(ytdlpProxy());
+}
+
+/**
+ * Bounded hard: every retry costs bandwidth and wall time, and renders are
+ * already queued.
  */
 async function ytdlpWithRetry(
   videoId: string,
@@ -108,14 +117,14 @@ async function ytdlpWithRetry(
   kind: "video" | "audio",
   range?: SourceRange,
 ): Promise<DownloadedSource> {
-  const tries = ytdlpProxy() ? 3 : 1;
+  const tries = 3;
   for (let attempt = 1; ; attempt++) {
     try {
       return await downloadViaYtdlp(videoId, dest, kind, range);
     } catch (error) {
-      // Anything that is not a block would fail identically on a new IP.
-      if (attempt >= tries || !isBlockError(error)) throw error;
-      console.warn(`[download] blocked on attempt ${attempt}/${tries}, retrying on a new IP`);
+      if (attempt >= tries || !worthRetrying(error)) throw error;
+      const why = isTransientError(error) ? "connection died" : "blocked";
+      console.warn(`[download] ${why} on attempt ${attempt}/${tries}, retrying`);
       await new Promise((r) => setTimeout(r, 1500 * attempt));
     }
   }

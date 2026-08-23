@@ -30,7 +30,21 @@ export function ytdlpBaseArgs() {
     `youtube:player_client=${ytdlpPlayerClient()}`,
   ];
   const proxy = resolveProxy();
-  if (proxy) args.push("--proxy", proxy);
+  if (proxy) {
+    args.push("--proxy", proxy);
+    // Residential peers stall and die. Let yt-dlp itself ride out the small
+    // failures before we throw the whole attempt away and pay for a new one.
+    args.push(
+      "--socket-timeout",
+      "30",
+      "--retries",
+      "10",
+      "--fragment-retries",
+      "10",
+      "--extractor-retries",
+      "5",
+    );
+  }
   return args;
 }
 
@@ -47,11 +61,28 @@ export async function cookieArgs(dir: string) {
   return ["--cookies", file];
 }
 
+function messageOf(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /**
  * Whether a failure is YouTube refusing the IP rather than something about the
- * video. Worth retrying on a rotating proxy; nothing else here is.
+ * video. Only worth retrying behind a rotating proxy, where the next attempt
+ * comes from somewhere else.
  */
 export function isBlockError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  return /403|Forbidden|not a bot|Sign in to confirm/i.test(message);
+  return /403|Forbidden|not a bot|Sign in to confirm/i.test(messageOf(error));
+}
+
+/**
+ * Whether the connection itself died rather than being refused. Residential
+ * exit nodes are other people's devices: they drop mid-handshake, go offline,
+ * and time out constantly. Always worth another attempt — a rotating pool
+ * hands the retry a different peer, and even without a proxy these are
+ * transient by nature.
+ */
+export function isTransientError(error: unknown) {
+  return /TLS\/SSL|SSLError|EOF|reset by peer|Connection reset|Remote end closed|timed out|Read timed out|Connection aborted|Broken pipe|502|503|NO_HOST_CONNECTION|NO_RAY/i.test(
+    messageOf(error),
+  );
 }
