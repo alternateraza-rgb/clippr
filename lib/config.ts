@@ -1,7 +1,19 @@
 export const RUBRIC_VERSION = "v1";
 
+/**
+ * Values that mean "not actually configured" even though something is there.
+ * `vercel env pull` writes the literal "[SENSITIVE]" for variables marked
+ * Sensitive, and .env.local templates use PASTE_. Both sail through every
+ * hasX() check and then fail at the first real call, which reads as a broken
+ * worker rather than a missing secret.
+ */
+function isPlaceholder(value: string) {
+  return value === "[SENSITIVE]" || value.startsWith("PASTE_");
+}
+
 export function env(name: string) {
-  return process.env[name]?.trim() || "";
+  const value = process.env[name]?.trim() || "";
+  return isPlaceholder(value) ? "" : value;
 }
 
 export function hasSupabase() {
