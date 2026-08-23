@@ -15,9 +15,15 @@ NPM="$(command -v npm)"
 NODE_BIN="$(dirname "$(command -v node)")"
 UID_NUM="$(id -u)"
 
+# bootout returns before the job is actually gone, and bootstrapping a label
+# that still exists fails with "Input/output error". Wait for it to disappear.
 unload() {
   for label in com.clipmuse.worker com.clipmuse.tunnel; do
     launchctl bootout "gui/$UID_NUM/$label" 2>/dev/null || true
+    for _ in $(seq 1 50); do
+      launchctl print "gui/$UID_NUM/$label" >/dev/null 2>&1 || break
+      sleep 0.2
+    done
   done
 }
 
