@@ -1,6 +1,7 @@
-import { mkdir, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
-import { hasApify, ytdlpFirst, ytdlpPlayerClient, ytdlpProxy, youtubeCookies } from "../../lib/config";
+import { mkdir, readdir, rename, rm, stat } from "node:fs/promises";
+import { hasApify, ytdlpFirst, ytdlpProxy } from "../../lib/config";
 import { downloadYoutubeViaApify } from "../../lib/ingest/apify";
+import { cookieArgs, isBlockError, ytdlpBaseArgs } from "../../lib/ingest/ytdlp";
 import { run } from "./exec";
 
 let ytdlpAvailable: boolean | null = null;
@@ -60,15 +61,7 @@ async function downloadViaYtdlp(
   await rm(dir, { recursive: true, force: true });
   await mkdir(dir, { recursive: true });
   try {
-    const proxy = ytdlpProxy();
-    const cookies = youtubeCookies();
-    const args = [
-      "--no-warnings",
-      "--no-playlist",
-      "--extractor-args",
-      `youtube:player_client=${ytdlpPlayerClient()}`,
-      ...formatArgs(kind),
-    ];
+    const args = [...ytdlpBaseArgs(), "--no-playlist", ...formatArgs(kind)];
     // Pulling only the clip window instead of the whole video — the difference
     // between megabytes and gigabytes when YTDLP_PROXY bills per GB.
     const start = range ? Math.max(0, range.start) : 0;
@@ -79,12 +72,7 @@ async function downloadViaYtdlp(
       // would make `offset` a lie and sit every caption off its word.
       args.push("--force-keyframes-at-cuts");
     }
-    if (proxy) args.push("--proxy", proxy);
-    if (cookies) {
-      const cookieFile = `${dir}/cookies.txt`;
-      await writeFile(cookieFile, cookies.endsWith("\n") ? cookies : `${cookies}\n`);
-      args.push("--cookies", cookieFile);
-    }
+    args.push(...(await cookieArgs(dir)));
     args.push("-o", `${dir}/src.%(ext)s`, youtubeUrl(videoId));
     await run("yt-dlp", args);
     const file = await pickOutput(dir);
@@ -109,6 +97,30 @@ async function pickOutput(dir: string) {
   return sized.sort((a, b) => b.size - a.size)[0].f;
 }
 
+/**
+ * A rotating residential endpoint hands out a different exit IP on reconnect,
+ * so a block is often survivable by simply trying again. Bounded hard: every
+ * retry costs bandwidth and wall time, and renders are already queued.
+ */
+async function ytdlpWithRetry(
+  videoId: string,
+  dest: string,
+  kind: "video" | "audio",
+  range?: SourceRange,
+): Promise<DownloadedSource> {
+  const tries = ytdlpProxy() ? 3 : 1;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await downloadViaYtdlp(videoId, dest, kind, range);
+    } catch (error) {
+      // Anything that is not a block would fail identically on a new IP.
+      if (attempt >= tries || !isBlockError(error)) throw error;
+      console.warn(`[download] blocked on attempt ${attempt}/${tries}, retrying on a new IP`);
+      await new Promise((r) => setTimeout(r, 1500 * attempt));
+    }
+  }
+}
+
 function reason(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return message.split("\n").filter(Boolean).slice(-1)[0]?.slice(0, 300) || "unknown error";
@@ -131,7 +143,7 @@ export async function downloadSource(
   const attempts: Array<[string, () => Promise<DownloadedSource>]> = [];
   const local: [string, () => Promise<DownloadedSource>] = [
     "yt-dlp",
-    () => downloadViaYtdlp(videoId, dest, kind, range),
+    () => ytdlpWithRetry(videoId, dest, kind, range),
   ];
   const apify: [string, () => Promise<DownloadedSource>] = [
     "Apify",
@@ -148,13 +160,22 @@ export async function downloadSource(
 
   const failures: string[] = [];
   for (const [name, attempt] of attempts) {
+    const startedAt = Date.now();
     try {
-      return await attempt();
+      const result = await attempt();
+      // The per-clip cost meter once bandwidth is metered by the GB.
+      const mb = (await stat(dest).catch(() => ({ size: 0 }))).size / 1024 / 1024;
+      const window = range ? `${range.start.toFixed(1)}-${range.end.toFixed(1)}s` : "full";
+      console.info(
+        `[download] provider=${name} kind=${kind} window=${window} ` +
+          `${mb.toFixed(2)}MB in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`,
+      );
+      return result;
     } catch (error) {
       failures.push(`${name}: ${reason(error)}`);
     }
   }
-  const blocked = failures.some((f) => /403|not a bot|Sign in to confirm/i.test(f));
+  const blocked = failures.some(isBlockError);
   const hint = blocked
     ? " YouTube is blocking this IP, not the request — cookies will not fix it." +
       " Set YTDLP_PROXY to a residential proxy, or run the worker from home (docs/LOCAL_WORKER.md)."

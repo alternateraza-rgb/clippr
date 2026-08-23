@@ -1,5 +1,8 @@
 # Home worker (your PC downloads YouTube)
 
+For why the hosted worker gets blocked at all, and the residential-proxy setup
+that fixes it without a laptop, see [DOWNLOADS.md](DOWNLOADS.md).
+
 Users only paste a link on Clipmuse. **Your computer** runs yt-dlp. Pause Render so YouTube is not hit from a datacenter IP.
 
 ## Once on this machine

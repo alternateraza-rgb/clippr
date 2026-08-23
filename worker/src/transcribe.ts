@@ -1,8 +1,8 @@
 import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ytdlpPlayerClient } from "../../lib/config";
 import { createAdminClient } from "../../lib/supabase/admin";
+import { cookieArgs, ytdlpBaseArgs } from "../../lib/ingest/ytdlp";
 import { upsertTranscribeJob } from "../../lib/supabase/jobs";
 import { downloadSource } from "./media";
 import { fetchSupadataTranscript } from "../../lib/ingest/supadata";
@@ -34,16 +34,15 @@ async function writeCache(videoId: string, transcript: TranscriptResult) {
 async function trySubs(dir: string, videoId: string): Promise<TranscriptResult | null> {
   try {
     await run("yt-dlp", [
+      ...ytdlpBaseArgs(),
       "--skip-download",
-      "--no-warnings",
       "--write-auto-sub",
       "--write-sub",
       "--sub-langs",
       "en.*,en",
       "--convert-subs",
       "vtt",
-      "--extractor-args",
-      `youtube:player_client=${ytdlpPlayerClient()}`,
+      ...(await cookieArgs(dir)),
       "-o",
       join(dir, "subs"),
       youtubeUrl(videoId),

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { exportEnabled } from "@/lib/config";
+import { cookieArgs, ytdlpBaseArgs } from "@/lib/ingest/ytdlp";
 import type { CaptionLine, CaptionPreset, ClipCandidate, GameplayTrack } from "@/lib/agent/types";
 import { getSessionUser } from "@/lib/auth/session";
 import { insertClipRender } from "@/lib/supabase/cache";
@@ -115,6 +116,8 @@ export async function POST(request: Request) {
 
   try {
     await run("yt-dlp", [
+      ...ytdlpBaseArgs(),
+      ...(await cookieArgs(dir)),
       "-f",
       "bv*[height<=720]+ba/b",
       "--download-sections",
