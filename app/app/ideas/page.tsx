@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PageHeader } from "@/components/app/PageHeader";
 import { VideoCard } from "@/components/app/VideoCard";
 import { Chip } from "@/components/ui/Chip";
 import { Pill } from "@/components/ui/Pill";
@@ -41,16 +42,13 @@ export default function IdeasPage() {
 
   return (
     <div>
-      <p className="text-[13px] font-medium text-muted">Today&apos;s cuts · {today}</p>
-      <h1 className="display mt-2 text-[28px] text-ink">
-        Ideas for {niche.label.toLowerCase()}
-      </h1>
-      <p className="mt-2 max-w-[48ch] text-body">
-        Longform with clipping potential in your niche. A thin day is a real
-        day — we don&apos;t invent volume.
-      </p>
+      <PageHeader
+        eyebrow={`Today's cuts · ${today}`}
+        title={`Ideas for ${niche.label.toLowerCase()}`}
+        lede="Longform with clipping potential in your niche. A thin day is a real day — we don't invent volume."
+      />
 
-      <div className="mt-6 flex flex-wrap gap-2">
+      <div className="mt-8 flex flex-wrap gap-2">
         <Chip selected={filter === "niche"} onClick={() => setFilter("niche")}>
           Your niche
         </Chip>

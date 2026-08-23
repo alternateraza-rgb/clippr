@@ -72,9 +72,15 @@ export function ClipPreview({
     [videoId, start, span, playing, origin],
   );
 
-  useEffect(() => {
+  // Resetting playback when the clip changes is an adjustment to a prop, not a
+  // side effect — doing it in an effect meant an extra render with the old
+  // value still on screen.
+  const clipKey = `${videoId}:${start}:${autoPlay}`;
+  const [seenKey, setSeenKey] = useState(clipKey);
+  if (clipKey !== seenKey) {
+    setSeenKey(clipKey);
     setPlaying(autoPlay);
-  }, [videoId, start, autoPlay]);
+  }
 
   // Anchor the caption clock to the iframe's real playback position instead
   // of assuming autoplay started the instant we requested it.

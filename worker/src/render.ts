@@ -133,7 +133,8 @@ export async function processRender(renderId: string) {
     const source = await downloadSource(row.video_id, sourceFile, "video", { start, end });
     await cutReencode(sourceFile, raw, start - source.offset, duration, "video");
 
-    await setStatus(renderId, { status: "transcribing", progress: 35 });
+    await setStatus(renderId, { status: "downloading", progress: 25 });
+    await setStatus(renderId, { status: "transcribing", progress: 38 });
     const audio = join(dir, "audio.mp3");
     await run("ffmpeg", ["-y", "-i", raw, "-vn", "-ac", "1", "-ar", "16000", "-b:a", "64k", audio]);
 
@@ -169,9 +170,13 @@ export async function processRender(renderId: string) {
     const editedLines = plan.removed.length ? remapCaptionLines(lines, plan.removed) : lines;
     const outDuration = plan.removed.length ? jumpCutDuration(duration, plan.removed) : duration;
 
+    // Checkpoints exist so the wait screen can say something true. The gap
+    // between "transcribed" and "finished" used to be one 62% update covering
+    // tracking, encoding and upload — minutes of silence, which is what made
+    // the UI look stuck.
     await setStatus(renderId, {
       status: "rendering",
-      progress: 62,
+      progress: 48,
       asr_source: asr,
       caption_lines: editedLines,
     });
@@ -181,6 +186,7 @@ export async function processRender(renderId: string) {
     // shots still cut, just centred.
     const track = await trackSpeaker(raw);
     const shots = planShots(plan.keep, words, track.centerAt);
+    await setStatus(renderId, { status: "rendering", progress: 58 });
     console.info(
       `[render] ${shots.length} shots · ${track.samples} face samples · ${outDuration.toFixed(1)}s`,
     );
@@ -254,6 +260,7 @@ export async function processRender(renderId: string) {
 
     let finalDuration = outDuration;
     try {
+      await setStatus(renderId, { status: "rendering", progress: 70 });
       await run("ffmpeg", buildArgs({ shots, outDuration }), { timeoutMs: 600_000 });
     } catch (renderErr) {
       // One static shot over the whole clip: no cuts, no reframing, but a file
@@ -271,6 +278,8 @@ export async function processRender(renderId: string) {
       );
     }
 
+    await setStatus(renderId, { status: "rendering", progress: 90 });
+
     const bytes = await readFile(out);
     const info = await stat(out);
     const outputPath = `${row.user_id}/${renderId}.mp4`;
@@ -279,6 +288,23 @@ export async function processRender(renderId: string) {
       upsert: true,
     });
     if (upload.error) throw new Error(upload.error.message);
+
+    // A poster beside the video, keyed off the same name so the API can sign it
+    // without a schema change. A grid of <video> elements with no poster has to
+    // fetch each file just to paint a first frame.
+    try {
+      const poster = join(dir, "poster.jpg");
+      await run("ffmpeg", ["-y", "-ss", "1", "-i", out, "-frames:v", "1", "-q:v", "4", poster], {
+        timeoutMs: 60_000,
+      });
+      await admin.storage.from("clips").upload(`${row.user_id}/${renderId}.jpg`, await readFile(poster), {
+        contentType: "image/jpeg",
+        upsert: true,
+      });
+    } catch (posterErr) {
+      // Cosmetic. The card falls back to a video frame.
+      console.warn("[render] no poster frame", posterErr instanceof Error ? posterErr.message : posterErr);
+    }
 
     await setStatus(renderId, {
       status: "ready",

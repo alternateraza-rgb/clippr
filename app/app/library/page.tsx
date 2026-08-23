@@ -1,95 +1,124 @@
 "use client";
 
-import Link from "next/link";
+import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { Film, RotateCw, X } from "lucide-react";
+import { ClipCard } from "@/components/app/ClipCard";
+import { ClipLightbox } from "@/components/app/ClipLightbox";
+import { PageHeader } from "@/components/app/PageHeader";
+import { Pill } from "@/components/ui/Pill";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { stagger } from "@/components/motion/presets";
 import { useRenders } from "@/lib/hooks/useRenders";
-import { clipFilename, downloadBlobUrl } from "@/lib/download";
-import { formatRelativeDate, formatTimestamp } from "@/lib/format";
+import type { ClipRender } from "@/lib/agent/types";
+
+type Clip = ClipRender & { posterUrl?: string | null };
 
 export default function LibraryPage() {
   const { renders, loading } = useRenders();
-  const finished = renders.filter((r) => r.status === "ready" && r.downloadUrl);
-  const pending = renders.filter((r) => r.status !== "ready");
+  const [open, setOpen] = useState<Clip | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+
+  const { clips, working, failed } = useMemo(() => {
+    const list = renders as Clip[];
+    return {
+      clips: list.filter((r) => r.status === "ready" && r.downloadUrl),
+      working: list.filter((r) => r.status !== "ready" && r.status !== "failed"),
+      // Failures stay out of the grid entirely — they were the clutter.
+      failed: list.filter((r) => r.status === "failed"),
+    };
+  }, [renders]);
 
   return (
     <div>
-      <p className="text-[13px] font-medium text-muted">Library</p>
-      <h1 className="display mt-2 text-[28px] text-ink">Clips you already cut</h1>
-      <p className="mt-2 max-w-[44ch] text-body">
-        Every finished clip downloads on its own. They stay here if you need
-        another copy.
-      </p>
+      <PageHeader
+        eyebrow="Library"
+        title="Clips you already cut"
+        lede="Every finished clip lands here and downloads itself. Hover to preview, click to watch."
+        action={
+          clips.length ? (
+            <p className="tnum text-[13px] text-muted">
+              {clips.length} clip{clips.length === 1 ? "" : "s"}
+            </p>
+          ) : null
+        }
+      />
 
-      {finished.length ? (
-        <div className="mt-10 grid gap-3">
-          {finished.map((render) => (
-            <div
-              key={render.id}
-              className="flex flex-col gap-3 rounded-[12px] bg-surface p-5 shadow-hairline sm:flex-row sm:items-center"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-[12px] tabular-nums text-muted">
-                  {formatRelativeDate(render.createdAt)}
-                  {render.startS != null && render.endS != null
-                    ? ` · ${formatTimestamp(render.startS)} – ${formatTimestamp(render.endS)}`
-                    : ""}
-                </p>
-                <h2 className="mt-1 line-clamp-2 text-[16px] font-medium text-ink">
-                  {render.hook || render.videoId}
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  downloadBlobUrl(render.downloadUrl!, clipFilename(render.videoId, render.id))
-                }
-                className="inline-flex items-center justify-center rounded-full bg-brand px-5 py-2.5 text-[14px] text-on-brand"
-              >
-                Download again
-              </button>
-            </div>
-          ))}
+      {working.length ? (
+        <div className="mt-8 flex items-center gap-3 rounded-[var(--radius-card,16px)] bg-surface px-5 py-4 shadow-hairline">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-brand" />
+          </span>
+          <p className="text-[14px] text-ink">
+            {working.length} clip{working.length === 1 ? "" : "s"} still rendering
+          </p>
+          <p className="text-[13px] text-muted">They appear here on their own.</p>
         </div>
       ) : null}
 
-      {/* Not clips yet, so they are not in the list above — but a render that
-          failed has to say so somewhere, or the clip just never appears. */}
-      {pending.length ? (
-        <section className="mt-10">
-          <p className="text-[13px] font-medium text-muted">In progress</p>
-          <div className="mt-4 grid gap-2">
-            {pending.map((render) => (
-              <div
-                key={render.id}
-                className="flex flex-col gap-2 rounded-[12px] bg-surface px-5 py-4 shadow-hairline sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <p className="text-[12px] capitalize tabular-nums text-muted">
-                    {render.status}
-                    {render.progress ? ` · ${render.progress}%` : ""} ·{" "}
-                    {formatRelativeDate(render.createdAt)}
-                  </p>
-                  <p className="mt-1 truncate text-[14px] text-ink">
-                    {render.hook || render.videoId}
-                  </p>
-                  {render.error ? (
-                    <p className="mt-1 text-[13px] text-brand">{render.error}</p>
-                  ) : null}
-                </div>
-                <Link
-                  href={`/app/studio?v=${render.videoId}`}
-                  className="shrink-0 text-[13px] text-muted underline-offset-4 hover:underline"
-                >
-                  Open in studio
-                </Link>
-              </div>
-            ))}
-          </div>
-        </section>
+      {loading && !clips.length ? (
+        <div className="mt-10 grid grid-cols-2 gap-5 md:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="aspect-[9/16]" />
+          ))}
+        </div>
+      ) : clips.length ? (
+        <motion.div
+          variants={stagger()}
+          initial="hidden"
+          animate="show"
+          className="mt-10 grid grid-cols-2 gap-5 md:grid-cols-3 xl:grid-cols-4"
+        >
+          {clips.map((render, i) => (
+            <ClipCard key={render.id} render={render} index={i} onOpen={() => setOpen(render)} />
+          ))}
+        </motion.div>
+      ) : !loading ? (
+        <EmptyState />
       ) : null}
 
-      {!loading && renders.length === 0 ? (
-        <p className="mt-16 text-body">Nothing here yet. Export a clip and it lands here.</p>
+      {/* Failures are quiet, not silent: one line, dismissible. A clip that
+          died with no trace at all just looks like the app lost it. */}
+      {failed.length && !dismissed ? (
+        <div className="mt-10 flex items-center gap-3 rounded-[var(--radius-control,10px)] bg-surface-warm px-4 py-3">
+          <p className="flex-1 text-[13px] text-body">
+            {failed.length} clip{failed.length === 1 ? "" : "s"} didn&apos;t finish.
+          </p>
+          <Pill variant="text" href="/app/studio">
+            <RotateCw className="h-3.5 w-3.5" strokeWidth={2} />
+            Try again
+          </Pill>
+          <button
+            type="button"
+            onClick={() => setDismissed(true)}
+            aria-label="Dismiss"
+            className="text-muted transition-colors hover:text-ink"
+          >
+            <X className="h-4 w-4" strokeWidth={1.9} />
+          </button>
+        </div>
       ) : null}
+
+      <ClipLightbox render={open} onClose={() => setOpen(null)} />
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="mt-12 flex flex-col items-center rounded-[var(--radius-panel,22px)] bg-surface px-6 py-16 text-center shadow-hairline">
+      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-warm">
+        <Film className="h-6 w-6 text-brand" strokeWidth={1.5} />
+      </span>
+      <p className="display mt-5 text-[20px] text-ink">Nothing cut yet</p>
+      <p className="mt-2 max-w-[34ch] text-[14px] text-body">
+        Paste a longform video in Studio and the first clip lands here in a
+        couple of minutes.
+      </p>
+      <Pill className="mt-6" href="/app/studio">
+        Open Studio
+      </Pill>
     </div>
   );
 }

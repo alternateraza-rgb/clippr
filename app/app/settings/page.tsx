@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PageHeader } from "@/components/app/PageHeader";
 import { Chip } from "@/components/ui/Chip";
 import { Pill } from "@/components/ui/Pill";
 import { signOut } from "@/app/auth/actions";
@@ -48,15 +49,15 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-[640px]">
-      <p className="text-[13px] font-medium text-muted">Settings</p>
-      <h1 className="display mt-2 text-[28px] text-ink">The desk</h1>
-      <p className="mt-2 text-body">
-        These preferences steer Home, Ideas, and the default Studio setup.
-      </p>
+      <PageHeader
+        eyebrow="Settings"
+        title="The desk"
+        lede="These preferences steer Home, Ideas, and the default Studio setup."
+      />
 
       {connections ? (
         <section className="mt-10 rounded-[12px] bg-surface p-5 shadow-hairline">
-          <p className="text-[13px] font-medium text-muted">Connections</p>
+          <p className="eyebrow text-muted">Connections</p>
           <ul className="mt-3 space-y-2 text-[14px] text-body">
             <li>{connections.authEnabled ? "Supabase auth is on." : "Supabase keys missing."}</li>
             <li>
@@ -114,7 +115,7 @@ export default function SettingsPage() {
       ) : null}
 
       <section className="mt-10">
-        <p className="text-[13px] font-medium text-muted">Name</p>
+        <p className="eyebrow text-muted">Name</p>
         <input
           value={profile.displayName}
           onChange={(e) => setProfile({ ...profile, displayName: e.target.value })}
@@ -123,7 +124,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="mt-8">
-        <p className="text-[13px] font-medium text-muted">Niche</p>
+        <p className="eyebrow text-muted">Niche</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {NICHES.map((n) => (
             <Chip
@@ -138,7 +139,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="mt-8">
-        <p className="text-[13px] font-medium text-muted">Platforms</p>
+        <p className="eyebrow text-muted">Platforms</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {PLATFORMS.map((p) => (
             <Chip
@@ -153,7 +154,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="mt-8">
-        <p className="text-[13px] font-medium text-muted">Formats</p>
+        <p className="eyebrow text-muted">Formats</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {FORMATS.map((f) => (
             <Chip
@@ -173,7 +174,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="mt-8">
-        <p className="text-[13px] font-medium text-muted">Default captions</p>
+        <p className="eyebrow text-muted">Default captions</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {(["hormozi", "clean", "karaoke"] as CaptionPreset[]).map((p) => (
             <Chip
@@ -188,7 +189,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="mt-8">
-        <p className="text-[13px] font-medium text-muted">Default gameplay</p>
+        <p className="eyebrow text-muted">Default gameplay</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {(["minecraft", "gta", "subway", "none"] as GameplayTrack[]).map((g) => (
             <Chip

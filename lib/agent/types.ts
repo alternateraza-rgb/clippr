@@ -118,6 +118,7 @@ export type ClipRender = {
   error?: string | null;
   outputPath?: string | null;
   downloadUrl?: string | null;
+  posterUrl?: string | null;
   durationS?: number | null;
   startS?: number | null;
   endS?: number | null;

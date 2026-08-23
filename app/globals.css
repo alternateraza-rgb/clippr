@@ -74,49 +74,107 @@ body {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.55'/></svg>");
 }
 
-.display {
-  font-family: var(--font-display);
-  font-weight: 300;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
+
+
+
+@layer components {
+  .display {
+    font-family: var(--font-display);
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+  }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+  .serif-em {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 400;
+  }
 }
 
-.eyebrow {
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--color-muted);
-}
-
-.serif-em {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
-}
-
+/* ---------------------------------------------------------------------------
+   Workspace
+   Denser than the landing page, but the same product. This used to override the
+   palette wholesale — zinc greys, no grain, heavier display type — which is why
+   signing up felt like landing in a different app. It now inherits the brand
+   and only adjusts what a tool actually needs: tighter rhythm, calmer surfaces,
+   a canvas that recedes behind content.
+--------------------------------------------------------------------------- */
 .workspace {
-  --color-canvas: #fafafa;
+  --color-canvas: #faf8f7;
   --color-surface: #ffffff;
-  --color-surface-warm: #f4f4f5;
-  --color-surface-warm-alt: #e4e4e7;
-  --color-hairline: #e4e4e7;
-  --color-ink: #09090b;
-  --color-body: #52525b;
-  --color-muted: #71717a;
-  --shadow-hairline: 0 0 0 1px var(--color-hairline);
-  --shadow-lift: 0 0 0 1px var(--color-hairline), 0 4px 14px rgb(9 9 11 / 0.06);
+  --color-surface-warm: #f4f1ef;
+  --color-surface-warm-alt: #e9e5e1;
+  --color-hairline: #e3ded8;
+
+  /* Elevation reads as light on a warm surface, not a grey box shadow. */
+  --shadow-hairline:
+    inset 0 0 0 0.5px rgb(0 0 0 / 0.05),
+    0 1px 2px rgb(78 50 23 / 0.04);
+  --shadow-lift:
+    inset 0 0 0 0.5px rgb(0 0 0 / 0.05),
+    0 2px 4px rgb(78 50 23 / 0.03),
+    0 12px 28px rgb(78 50 23 / 0.09);
+  --shadow-pop:
+    inset 0 0 0 0.5px rgb(0 0 0 / 0.06),
+    0 24px 60px rgb(78 50 23 / 0.16);
+
   --radius-control: 10px;
+  --radius-card: 16px;
+  --radius-panel: 22px;
+
+  --dur-fast: 140ms;
+  --dur-base: 240ms;
+  --dur-slow: 520ms;
+
   background: var(--color-canvas);
 }
 
-.workspace .display {
-  font-weight: 500;
-  letter-spacing: -0.01em;
+/* The display face carries the brand; keeping it light is most of the reason
+   the landing page looks considered. It was 500 here, which flattened it. */
+@layer components {
+  .workspace .display {
+    font-weight: 300;
+    letter-spacing: -0.018em;
+  }
 }
 
+/* Grain stays, quieter — at landing strength it fights dense UI. */
 body.grain:has(.workspace)::after {
-  display: none;
+  opacity: 0.018;
+}
+
+/* Focus that belongs to the brand rather than the browser default. */
+.workspace :focus-visible {
+  outline: 2px solid var(--color-brand-tint);
+  outline-offset: 2px;
+  border-radius: var(--radius-control);
+}
+
+/* Numbers in a UI should not wobble as they count. */
+@layer components {
+  .workspace .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+/* Hairline rule used between sections instead of a hard border. */
+@layer components {
+  .workspace .rule {
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      var(--color-hairline),
+      color-mix(in srgb, var(--color-hairline) 30%, transparent)
+    );
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -130,3 +188,9 @@ body.grain:has(.workspace)::after {
   }
 }
 
+
+@keyframes sweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
