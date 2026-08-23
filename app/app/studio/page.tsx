@@ -9,8 +9,8 @@ import { Chip } from "@/components/ui/Chip";
 import { Field } from "@/components/ui/Field";
 import { Pill } from "@/components/ui/Pill";
 import { ScoreRing } from "@/components/ui/ScoreRing";
-import { useJobs } from "@/lib/store/jobs";
 import { parseYouTubeId } from "@/lib/youtube";
+import { clipFilename, downloadBlobUrl, markDownloaded } from "@/lib/download";
 import { formatTimestamp } from "@/lib/format";
 import { useProfile } from "@/lib/store/profile";
 import type {
@@ -26,7 +26,6 @@ type Phase = "idle" | "running" | "results";
 function StudioInner() {
   const params = useSearchParams();
   const { profile } = useProfile();
-  const { addJob } = useJobs();
   const initialId =
     params.get("v") ?? parseYouTubeId(params.get("url") ?? "") ?? "";
   const abort = useRef<AbortController | null>(null);
@@ -41,7 +40,6 @@ function StudioInner() {
   const [selected, setSelected] = useState<ClipCandidate | null>(null);
   const [gameplay, setGameplay] = useState<GameplayTrack>(profile.defaultGameplay);
   const [preset, setPreset] = useState<CaptionPreset>(profile.captionPreset);
-  const [saved, setSaved] = useState(false);
   const [exportMsg, setExportMsg] = useState("");
   const [exporting, setExporting] = useState(false);
   const [connections, setConnections] = useState<{
@@ -178,7 +176,6 @@ function StudioInner() {
     abort.current = controller;
     setAnalysis(null);
     setSelected(null);
-    setSaved(false);
     setExportMsg("");
     setEvents([]);
     setCaptionSync("idle");
@@ -294,32 +291,6 @@ function StudioInner() {
     return Math.max(4, selected.end - selected.start);
   }, [selected]);
 
-  async function saveClip() {
-    if (!analysis || !selected) return;
-    const job = {
-      id: crypto.randomUUID(),
-      video: analysis.video,
-      candidate: selected,
-      composition: {
-        videoId: analysis.video.videoId,
-        start: selected.start,
-        end: selected.end,
-        gameplay,
-        captionPreset: preset,
-        captionLines: selected.captionLines,
-      },
-      status: "saved" as const,
-      createdAt: new Date().toISOString(),
-    };
-    addJob(job);
-    await fetch("/api/studio/save", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(job),
-    }).catch(() => null);
-    setSaved(true);
-  }
-
   async function pollRender(renderId: string) {
     const deadline = Date.now() + 8 * 60_000;
     while (Date.now() < deadline) {
@@ -335,14 +306,11 @@ function StudioInner() {
       const render = data.render;
       if (!render) break;
       if (render.status === "ready" && render.downloadUrl) {
-        const file = await fetch(render.downloadUrl);
-        const blob = await file.blob();
-        const href = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = href;
-        a.download = `clipmuse-${analysis?.video.videoId ?? "clip"}.mp4`;
-        a.click();
-        URL.revokeObjectURL(href);
+        markDownloaded(renderId);
+        await downloadBlobUrl(
+          render.downloadUrl,
+          clipFilename(analysis?.video.videoId ?? "", renderId),
+        );
         setExportMsg("Downloaded.");
         return;
       }
@@ -353,7 +321,7 @@ function StudioInner() {
       setExportMsg(`${render.status}${render.progress ? ` · ${render.progress}%` : ""}`);
       await new Promise((r) => setTimeout(r, 3000));
     }
-    setExportMsg("Still rendering. Check Library in a minute.");
+    setExportMsg("Still rendering. It downloads on its own when it is done.");
   }
 
   async function exportClip() {
@@ -381,8 +349,11 @@ function StudioInner() {
         const a = document.createElement("a");
         a.href = href;
         a.download = `clipmuse-${analysis.video.videoId}.mp4`;
+        a.style.display = "none";
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(href);
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(href), 60_000);
         setExportMsg("Downloaded.");
         return;
       }
@@ -488,10 +459,7 @@ function StudioInner() {
               <button
                 key={c.id}
                 type="button"
-                onClick={() => {
-                  setSelected(c);
-                  setSaved(false);
-                }}
+                onClick={() => setSelected(c)}
                 className={`w-full rounded-[12px] bg-surface p-5 text-left shadow-hairline transition-all ${
                   selected?.id === c.id ? "ring-1 ring-brand" : "hover:shadow-lift"
                 }`}
@@ -529,10 +497,7 @@ function StudioInner() {
             <div className="mt-5 rounded-[12px] bg-surface p-5 shadow-hairline">
               <ScoreBreakdown scores={selected.scores} />
               <div className="mt-5 flex flex-col gap-2">
-                <Pill onClick={saveClip} className="w-full">
-                  {saved ? "Saved to library" : "Save clip"}
-                </Pill>
-                <Pill variant="ghost" className="w-full" onClick={exportClip} disabled={exporting}>
+                <Pill className="w-full" onClick={exportClip} disabled={exporting}>
                   {exporting ? "Rendering…" : "Export"}
                 </Pill>
               </div>
