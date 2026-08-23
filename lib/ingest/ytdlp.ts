@@ -32,17 +32,18 @@ export function ytdlpBaseArgs() {
   const proxy = resolveProxy();
   if (proxy) {
     args.push("--proxy", proxy);
-    // Residential peers stall and die. Let yt-dlp itself ride out the small
-    // failures before we throw the whole attempt away and pay for a new one.
+    // Ride out small stalls, but stay well inside the caller's timeout — a
+    // long internal retry budget just converts a dead peer into a hung job
+    // instead of a fast failure we could retry on a live one.
     args.push(
       "--socket-timeout",
-      "30",
+      "20",
       "--retries",
-      "10",
+      "3",
       "--fragment-retries",
-      "10",
+      "3",
       "--extractor-retries",
-      "5",
+      "2",
     );
   }
   return args;

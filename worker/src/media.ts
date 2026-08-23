@@ -74,7 +74,9 @@ async function downloadViaYtdlp(
     }
     args.push(...(await cookieArgs(dir)));
     args.push("-o", `${dir}/src.%(ext)s`, youtubeUrl(videoId));
-    await run("yt-dlp", args);
+    // A stalled peer must fail fast so the retry can pick a live one. Audio
+    // gets longer because whisperWindow pulls ten minutes of it.
+    await run("yt-dlp", args, { timeoutMs: kind === "audio" ? 240_000 : 150_000 });
     const file = await pickOutput(dir);
     if (!file) throw new Error("yt-dlp finished but wrote no file");
     await rename(`${dir}/${file}`, dest);
@@ -199,41 +201,28 @@ export async function cutReencode(
   duration: number,
   kind: "video" | "audio",
 ) {
+  const base = ["-y", "-ss", start.toFixed(2), "-i", src, "-t", duration.toFixed(2)];
+  // ffmpeg can wedge on a truncated download just as easily as yt-dlp can on a
+  // dead peer, and a wedged encode holds the queue exactly the same way.
+  const opts = { timeoutMs: 300_000 };
   if (kind === "audio") {
-    await run("ffmpeg", [
-      "-y",
-      "-ss",
-      start.toFixed(2),
-      "-i",
-      src,
-      "-t",
-      duration.toFixed(2),
-      "-ac",
-      "1",
-      "-ar",
-      "16000",
-      "-b:a",
-      "64k",
-      dest,
-    ]);
+    await run("ffmpeg", [...base, "-ac", "1", "-ar", "16000", "-b:a", "64k", dest], opts);
     return;
   }
-  await run("ffmpeg", [
-    "-y",
-    "-ss",
-    start.toFixed(2),
-    "-i",
-    src,
-    "-t",
-    duration.toFixed(2),
-    "-c:v",
-    "libx264",
-    "-preset",
-    "ultrafast",
-    "-c:a",
-    "aac",
-    "-movflags",
-    "+faststart",
-    dest,
-  ]);
+  await run(
+    "ffmpeg",
+    [
+      ...base,
+      "-c:v",
+      "libx264",
+      "-preset",
+      "ultrafast",
+      "-c:a",
+      "aac",
+      "-movflags",
+      "+faststart",
+      dest,
+    ],
+    opts,
+  );
 }

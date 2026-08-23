@@ -279,9 +279,24 @@ export async function processRender(renderId: string) {
   }
 }
 
+/** Nothing legitimately sits in one in-flight status this long. */
+const STALE_MS = 20 * 60 * 1000;
+
+const IN_FLIGHT = ["downloading", "transcribing", "scoring", "rendering"];
+
 export async function drainQueued(limit = 5) {
   const admin = createAdminClient();
   if (!admin) return [];
+  // A worker killed mid-render — deploy, spin-down, or a wedged subprocess —
+  // leaves the row in an in-flight status that nothing ever looks at again, so
+  // the clip is stuck at "downloading 8%" forever. Put those back in the queue.
+  const { data: stale } = await admin
+    .from("clip_renders")
+    .update({ status: "queued", progress: 0 })
+    .in("status", IN_FLIGHT)
+    .lt("updated_at", new Date(Date.now() - STALE_MS).toISOString())
+    .select("id");
+  if (stale?.length) console.warn(`[render] requeued ${stale.length} stalled render(s)`);
   const { data } = await admin
     .from("clip_renders")
     .select("id")
