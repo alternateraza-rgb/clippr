@@ -7,7 +7,6 @@ import { env, hasApify, hasLlm, hasServiceRole, hasSupadata, workerSecret, ytdlp
 import { upsertTranscribeJob } from "../../lib/supabase/jobs";
 import { drainQueued, processRender } from "./render";
 import { processTranscribe } from "./transcribe";
-import { processRefine } from "./refine";
 import { run } from "./exec";
 import { downloadSource } from "./media";
 
@@ -155,7 +154,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === "POST" && (url.pathname === "/render" || url.pathname === "/drain" || url.pathname === "/transcribe" || url.pathname === "/refine" || url.pathname === "/selftest")) {
+  if (req.method === "POST" && (url.pathname === "/render" || url.pathname === "/drain" || url.pathname === "/transcribe" || url.pathname === "/selftest")) {
     if (!authorize(req)) {
       res.writeHead(401, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: false, reason: "unauthorized" }));
@@ -173,27 +172,6 @@ const server = createServer(async (req, res) => {
         enqueueTranscribe(videoId);
         res.writeHead(202, { "content-type": "application/json" });
         res.end(JSON.stringify({ ok: true, videoId }));
-        return;
-      }
-      if (url.pathname === "/refine") {
-        const body = await readJson(req);
-        const videoId = String(body.videoId || body.id || "");
-        const start = Number(body.start);
-        const end = Number(body.end);
-        if (!videoId || !Number.isFinite(start) || !Number.isFinite(end)) {
-          res.writeHead(400, { "content-type": "application/json" });
-          res.end(JSON.stringify({ ok: false, reason: "missing_window" }));
-          return;
-        }
-        const refined = await processRefine(videoId, start, end);
-        res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ ok: true, ...refined }));
-        return;
-      }
-      if (url.pathname === "/selftest") {
-        const body = await readJson(req).catch(() => ({}) as Record<string, unknown>);
-        res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify(await selftest(body)));
         return;
       }
       if (url.pathname === "/drain") {

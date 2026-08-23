@@ -4,7 +4,9 @@ import { ENTER_MS, PUNCH_MS } from "../../lib/captions/motion";
 const W = 720;
 const H = 1280;
 const FONT = "Anton";
-const SIZE = 62;
+// Anton is condensed, so it reads smaller than its nominal size — this is
+// tuned against rendered frames, not picked off a scale.
+const SIZE = 78;
 /** Distance from the bottom of frame to the caption baseline. Clear of both the
  *  platform UI and the lower third where faces usually sit. */
 const MARGIN_V = 250;

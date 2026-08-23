@@ -27,6 +27,9 @@ RUN npm ci
 
 COPY lib ./lib
 COPY worker ./worker
+# The same Anton the laptop uses, so captions render identically on both.
+COPY assets ./assets
+COPY scripts ./scripts
 
 ENV NODE_ENV=production
 ENV PORT=8787
