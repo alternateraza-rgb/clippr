@@ -9,7 +9,10 @@
     "lint": "eslint",
     "spike": "tsx scripts/spike.ts",
     "worker": "tsx worker/src/server.ts",
-    "worker:tunnel": "npx --yes cloudflared tunnel --url http://127.0.0.1:8787"
+    "worker:tunnel": "tsx scripts/tunnel.ts",
+    "service:install": "./scripts/install-mac-service.sh",
+    "service:uninstall": "./scripts/install-mac-service.sh uninstall",
+    "service:logs": "tail -f ~/Library/Logs/clipmuse/com.clipmuse.*.log"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
@@ -24,6 +27,7 @@
     "youtube-caption-extractor": "^1.10.2"
   },
   "devDependencies": {
+    "@ngrok/ngrok": "^1.7.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
