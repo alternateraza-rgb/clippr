@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ytdlpPlayerClient } from "../../lib/config";
 import { createAdminClient } from "../../lib/supabase/admin";
 import { upsertTranscribeJob } from "../../lib/supabase/jobs";
 import { downloadSource } from "./media";
@@ -42,7 +43,7 @@ async function trySubs(dir: string, videoId: string): Promise<TranscriptResult |
       "--convert-subs",
       "vtt",
       "--extractor-args",
-      "youtube:player_client=android,web",
+      `youtube:player_client=${ytdlpPlayerClient()}`,
       "-o",
       join(dir, "subs"),
       youtubeUrl(videoId),
@@ -74,7 +75,8 @@ async function whisperFromFile(audio: string): Promise<TranscriptResult> {
 async function whisperWindow(dir: string, videoId: string): Promise<TranscriptResult> {
   const audio = join(dir, "audio.mp3");
   const apifyAudio = join(dir, "audio.m4a");
-  await downloadSource(videoId, apifyAudio, "audio");
+  // Whisper only ever sees the first AUDIO_CAP_S, so never pay to pull more.
+  await downloadSource(videoId, apifyAudio, "audio", { start: 0, end: AUDIO_CAP_S });
   await run("ffmpeg", [
     "-y",
     "-i",

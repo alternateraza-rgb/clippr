@@ -5,8 +5,17 @@ Users only paste a link on Clipmuse. **Your computer** runs yt-dlp. Pause Render
 ## Once on this machine
 
 1. Install **Node**, **yt-dlp**, and **ffmpeg**
-   - macOS: `brew install yt-dlp ffmpeg`
+   - macOS with Homebrew: `brew install yt-dlp ffmpeg`
+   - macOS without Homebrew (no sudo needed):
+     `pip3 install --user uv && uv tool install yt-dlp` puts yt-dlp in
+     `~/.local/bin`; `pip3 install --user imageio-ffmpeg` ships an ffmpeg binary
+     you can symlink there too. Add `~/.local/bin` to `PATH` in `~/.zshrc` —
+     the worker shells out by name, so it has to be on `PATH`, not just installed.
    - Windows: `winget install yt-dlp.yt-dlp Gyan.FFmpeg`
+
+   **yt-dlp must be current.** It needs Python 3.10+, so a Mac using Xcode's
+   bundled Python 3.9 silently pins you to an old release that YouTube already
+   rejects. `yt-dlp --version` should be within a few weeks of today.
 2. Put secrets in `.env.local` (repo root). Need:
    - `CLIP_WORKER_SECRET` — same value as Vercel
    - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`

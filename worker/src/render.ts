@@ -72,10 +72,20 @@ async function probeFps(file: string): Promise<number> {
     const raw = stdout.trim();
     const [num, den] = raw.split("/").map(Number);
     if (den) return num / den;
-    return Number(raw) || 30;
+    if (Number(raw)) return Number(raw);
   } catch {
-    return 30;
+    // ffprobe is not always installed next to ffmpeg — pip-installed builds
+    // ship the encoder alone — so read the rate off ffmpeg's own stream dump.
+    // `ffmpeg -i` with no output exits non-zero, hence the parse in catch.
   }
+  try {
+    await run("ffmpeg", ["-hide_banner", "-i", file]);
+  } catch (error) {
+    const dump = error instanceof Error ? error.message : "";
+    const fps = Number(/([\d.]+) fps/.exec(dump)?.[1]);
+    if (fps) return fps;
+  }
+  return 30;
 }
 
 export async function processRender(renderId: string) {
@@ -96,10 +106,12 @@ export async function processRender(renderId: string) {
   try {
     await setStatus(renderId, { status: "downloading", progress: 8, error: null });
     const duration = Math.max(1, end - start);
-    const apifyFile = join(dir, "full.mp4");
+    const sourceFile = join(dir, "full.mp4");
     const raw = join(dir, "raw.mp4");
-    await downloadSource(row.video_id, apifyFile, "video");
-    await cutReencode(apifyFile, raw, start, duration, "video");
+    // Ask for just the clip window. A provider that can only return the whole
+    // video reports offset 0, and the cut below stays correct either way.
+    const source = await downloadSource(row.video_id, sourceFile, "video", { start, end });
+    await cutReencode(sourceFile, raw, start - source.offset, duration, "video");
 
     await setStatus(renderId, { status: "transcribing", progress: 35 });
     const audio = join(dir, "audio.mp3");

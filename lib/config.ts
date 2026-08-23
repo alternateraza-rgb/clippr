@@ -66,6 +66,15 @@ export function ytdlpProxy() {
 }
 
 /**
+ * Which YouTube clients yt-dlp should try, in order. The default web client is
+ * gated behind a PO token / sign-in check ("Sign in to confirm you're not a
+ * bot"); tv and web_safari still work unauthenticated.
+ */
+export function ytdlpPlayerClient() {
+  return env("YTDLP_PLAYER_CLIENT") || "tv,web_safari,default";
+}
+
+/**
  * Whether to try yt-dlp before Apify. True when the download would come from an
  * IP YouTube tolerates: a residential proxy, or a home machine running the
  * worker without an Apify token.

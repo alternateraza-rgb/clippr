@@ -19,8 +19,11 @@ export async function processRefine(videoId: string, start: number, end: number)
   try {
     const source = join(dir, "audio.m4a");
     const window = join(dir, "window.mp3");
-    await downloadSource(videoId, source, "audio");
-    await cutReencode(source, window, from, duration, "audio");
+    const downloaded = await downloadSource(videoId, source, "audio", {
+      start: from,
+      end: from + duration,
+    });
+    await cutReencode(source, window, from - downloaded.offset, duration, "audio");
     const transcript = await transcribeFile(window);
     if (!transcript.words.length) throw new Error("Whisper returned no words for this window");
     const last = transcript.words[transcript.words.length - 1]?.end ?? duration;

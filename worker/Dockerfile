@@ -1,5 +1,10 @@
 FROM node:22-bookworm-slim
 
+# Bump this to rebuild with a current yt-dlp. An old yt-dlp cannot solve
+# YouTube's current signature challenge and fails with "Sign in to confirm
+# you're not a bot" — which reads exactly like an IP block but is not one.
+ARG YTDLP_VERSION=2026.8.19
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
@@ -12,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && curl -fsSL -o /usr/share/fonts/truetype/clipmuse/Anton-Regular.ttf \
     "https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf" \
   && fc-cache -f \
-  && pip3 install --break-system-packages --no-cache-dir yt-dlp \
+  && pip3 install --break-system-packages --no-cache-dir "yt-dlp==${YTDLP_VERSION}" \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
