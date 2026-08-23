@@ -13,7 +13,7 @@ export async function processRefine(videoId: string, start: number, end: number)
   if (!videoId) throw new Error("missing videoId");
   const from = Math.max(0, start);
   const to = Math.max(from + 4, end);
-  const duration = Math.min(45, to - from);
+  const duration = Math.min(75, to - from);
   const dir = join(tmpdir(), "clipmuse-refine", `${videoId}-${from.toFixed(1)}`);
   await mkdir(dir, { recursive: true });
   try {

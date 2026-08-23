@@ -40,7 +40,7 @@ async function which(bin: string) {
 function clampRange(start: number, end: number) {
   const s = Math.max(0, start);
   let e = Math.max(s + 8, end);
-  if (e - s > 45) e = s + 45;
+  if (e - s > 75) e = s + 75;
   return { start: s, end: e };
 }
 

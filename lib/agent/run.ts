@@ -169,12 +169,16 @@ export async function* runAnalysis(
         `Found a ${Math.round(top.end - top.start)}s hook at ${fmt(top.start)} — “${top.hook.slice(0, 72)}”`,
       );
     }
-    yield emit("compose", `Composing ${filled.length} cuts · ${meta.source} · ${meta.ms}ms`);
-    yield emit("done", filled.length ? "Ready." : "No strong cuts on this tape.");
+    // One clip ships. The others exist only so the model had something to
+    // compare against — showing them was what made the old flow a menu of
+    // previews nobody could actually preview.
+    const winner = [filled[0]];
+    yield emit("compose", `Locked the cut · ${meta.source} · ${meta.ms}ms`);
+    yield emit("done", "Ready.");
 
     const analysis: AnalysisResult = {
       video,
-      candidates: filled,
+      candidates: winner,
       events: [...events],
       scoreSource: meta.source,
     };

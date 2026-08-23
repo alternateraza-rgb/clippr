@@ -46,10 +46,10 @@ export function snapRange(
   if (best < 0) return { start, end };
 
   const from = words[best].start;
-  const want = Math.max(12, Math.min(40, end - start || 20));
+  const want = Math.max(45, Math.min(65, end - start || 55));
   let to = from + want;
   const last = words.find((w) => w.start >= to) ?? words[words.length - 1];
-  to = Math.max(from + 8, Math.min(last.end, from + 45));
+  to = Math.max(from + 30, Math.min(last.end, from + 70));
   return { start: from, end: to };
 }
 

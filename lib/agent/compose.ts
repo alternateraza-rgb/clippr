@@ -5,17 +5,11 @@ export function captionLinesForRange(
   start: number,
   end: number,
 ): CaptionLine[] {
+  // Only words actually inside the window. This used to fall back to "the 12
+  // nearest words" and rebase them onto the clip, which puts captions on screen
+  // for speech that is not being spoken. No captions beats wrong captions.
   const overlapping = words.filter((w) => w.end > start && w.start < end);
-  const nearby =
-    overlapping.length > 0
-      ? overlapping
-      : words
-          .filter((w) => w.text.trim())
-          .slice()
-          .sort((a, b) => Math.abs(a.start - start) - Math.abs(b.start - start))
-          .slice(0, 12)
-          .sort((a, b) => a.start - b.start);
-  const slice = nearby.map((w) => ({
+  const slice = overlapping.map((w) => ({
     text: w.text,
     start: Math.max(0, w.start - start),
     end: Math.max(0.05, w.end - start),

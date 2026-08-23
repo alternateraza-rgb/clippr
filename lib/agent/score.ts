@@ -42,7 +42,7 @@ function toCandidates(raw: unknown, words: WordTiming[]): ClipCandidate[] {
       const endRaw = pickOffset(c, ["end", "end_s", "endSec", "endTime", "to", "t1"]);
       if (startRaw == null || endRaw == null) return null;
       const hook = String(c.hook || c.title || "").slice(0, 220);
-      const snapped = snapRange(startRaw, Math.max(startRaw + 8, endRaw), hook, words);
+      const snapped = snapRange(startRaw, Math.max(startRaw + 45, endRaw), hook, words);
       const tightened = tightenRange(words, snapped.start, snapped.end);
       const start = tightened.start;
       const finish = tightened.end;
@@ -66,7 +66,7 @@ function toCandidates(raw: unknown, words: WordTiming[]): ClipCandidate[] {
       } satisfies ClipCandidate;
     })
     .filter((c): c is ClipCandidate => Boolean(c))
-    .slice(0, 5);
+    .slice(0, 3);
 }
 
 async function scoreWithLlm(
@@ -117,7 +117,7 @@ export async function scoreTranscript(
       const extra =
         attempt === 0
           ? undefined
-          : 'Previous reply was unusable. start and end must be JSON numbers in seconds (522.4), never "8:42". Return {"candidates":[...]} with at least 3 clips of 12–45s.';
+          : 'Previous reply was unusable. start and end must be JSON numbers in seconds (522.4), never "8:42". Return {"candidates":[...]} with exactly 3 clips, each 50-60 seconds long.';
       const { candidates, model, tokens } = await scoreWithLlm(transcript, niche, extra);
       return {
         candidates,

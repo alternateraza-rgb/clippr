@@ -7,7 +7,9 @@ import { captionLinesForRange } from "../../lib/agent/compose";
 import { jumpCutDuration, planJumpCuts, remapCaptionLines, type Interval } from "../../lib/agent/jumpcuts";
 import type { CaptionLine, CaptionPreset, RenderStatus, WordTiming } from "../../lib/agent/types";
 import { buildAss } from "./ass";
-import { biasedCrop, jumpCutChain, kenBurnsZoom } from "./filters";
+import { shotChain } from "./filters";
+import { planShots, type Shot } from "../../lib/agent/shots";
+import { trackSpeaker } from "./track";
 import { run } from "./exec";
 import { transcribeFile } from "./whisper";
 import { cutReencode, downloadSource } from "./media";
@@ -56,7 +58,15 @@ async function fetchGameplayLoop(
   return dest;
 }
 
-async function probeFps(file: string): Promise<number> {
+type SourceInfo = { width: number; height: number };
+
+/**
+ * Frame size of the downloaded clip. The crop maths needs real dimensions —
+ * assuming 1280x720 would frame a 4K source wrong. ffprobe is not installed
+ * everywhere (a pip-installed ffmpeg ships the encoder alone), so fall back to
+ * ffmpeg's own stream dump, which exits non-zero by design with no output file.
+ */
+async function probeSource(file: string): Promise<SourceInfo> {
   try {
     const { stdout } = await run("ffprobe", [
       "-v",
@@ -64,28 +74,38 @@ async function probeFps(file: string): Promise<number> {
       "-select_streams",
       "v:0",
       "-show_entries",
-      "stream=r_frame_rate",
+      "stream=width,height",
       "-of",
-      "default=noprint_wrappers=1:nokey=1",
+      "csv=p=0",
       file,
     ]);
-    const raw = stdout.trim();
-    const [num, den] = raw.split("/").map(Number);
-    if (den) return num / den;
-    if (Number(raw)) return Number(raw);
+    const [w, h] = stdout.trim().split(",").map(Number);
+    if (w > 0 && h > 0) return { width: w, height: h };
   } catch {
-    // ffprobe is not always installed next to ffmpeg — pip-installed builds
-    // ship the encoder alone — so read the rate off ffmpeg's own stream dump.
-    // `ffmpeg -i` with no output exits non-zero, hence the parse in catch.
+    // fall through to the ffmpeg dump
   }
   try {
     await run("ffmpeg", ["-hide_banner", "-i", file]);
   } catch (error) {
     const dump = error instanceof Error ? error.message : "";
-    const fps = Number(/([\d.]+) fps/.exec(dump)?.[1]);
-    if (fps) return fps;
+    const match = /,\s(\d{2,5})x(\d{2,5})[\s,]/.exec(dump);
+    if (match) return { width: Number(match[1]), height: Number(match[2]) };
   }
-  return 30;
+  return { width: 1280, height: 720 };
+}
+
+let videotoolbox: boolean | null = null;
+
+/** Apple's hardware encoder where it exists — same job, a fraction of the CPU. */
+async function encoderArgs(): Promise<string[]> {
+  if (videotoolbox === null) {
+    videotoolbox = await run("ffmpeg", ["-hide_banner", "-encoders"])
+      .then(({ stdout }) => stdout.includes("h264_videotoolbox"))
+      .catch(() => false);
+  }
+  return videotoolbox
+    ? ["-c:v", "h264_videotoolbox", "-b:v", "6M", "-profile:v", "high"]
+    : ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"];
 }
 
 export async function processRender(renderId: string) {
@@ -98,7 +118,7 @@ export async function processRender(renderId: string) {
 
   let start = Math.max(0, Number(row.start_s) || 0);
   let end = Math.max(start + 8, Number(row.end_s) || start + 20);
-  if (end - start > 45) end = start + 45;
+  if (end - start > 75) end = start + 75;
 
   const dir = join(tmpdir(), "clipmuse-worker", renderId);
   await mkdir(dir, { recursive: true });
@@ -156,54 +176,55 @@ export async function processRender(renderId: string) {
       caption_lines: editedLines,
     });
 
-    const preset = row.caption_preset ?? "hormozi";
-    const assEditedPath = join(dir, "captions.ass");
-    await writeFile(assEditedPath, buildAss(editedLines, preset), "utf8");
-    const assPlainPath = plan.removed.length ? join(dir, "captions-plain.ass") : assEditedPath;
-    if (plan.removed.length) {
-      await writeFile(assPlainPath, buildAss(lines, preset), "utf8");
-    }
+    const frame = await probeSource(raw);
+    // Framing follows the speaker where we can see them; where we cannot, the
+    // shots still cut, just centred.
+    const track = await trackSpeaker(raw);
+    const shots = planShots(plan.keep, words, track.centerAt);
+    console.info(
+      `[render] ${shots.length} shots · ${track.samples} face samples · ${outDuration.toFixed(1)}s`,
+    );
+
+    const assPath = join(dir, "captions.ass");
+    await writeFile(assPath, buildAss(editedLines), "utf8");
 
     const out = join(dir, "out.mp4");
-    const fontsDir = existsSync("/usr/share/fonts/truetype/clipmuse")
-      ? ":fontsdir=/usr/share/fonts/truetype/clipmuse"
-      : existsSync("/usr/share/fonts/truetype/liberation")
-        ? ":fontsdir=/usr/share/fonts/truetype/liberation"
-        : "";
+    // libass silently falls back to a default sans when the font is missing,
+    // which is why captions render in the wrong typeface rather than failing.
+    // The Docker image installs Anton system-wide; a laptop keeps it in the
+    // repo or the user font directory.
+    const fontDirs = [
+      join(process.cwd(), "assets", "fonts"),
+      `${process.env.HOME}/Library/Fonts`,
+      "/usr/share/fonts/truetype/clipmuse",
+      "/usr/share/fonts/truetype/liberation",
+    ];
+    const found = fontDirs.find((d) => existsSync(join(d, "Anton-Regular.ttf"))) ?? fontDirs.find(existsSync);
+    const fontsDir = found ? `:fontsdir=${found}` : "";
     const gameplayFile = await fetchGameplayLoop(dir, row.gameplay, admin);
-    const fps = await probeFps(raw);
+    const encoder = await encoderArgs();
 
-    function buildArgs(opts: { withEdits: boolean; keep: Interval[]; assPath: string; outDuration: number }) {
-      const assFilter = `ass=${opts.assPath.replace(/\\/g, "/").replace(/:/g, "\\:")}${fontsDir}`;
-      const zoom = opts.withEdits;
-      const parts: string[] = [];
-      let videoLabel: string;
-      let audioMap: string;
-
-      if (opts.withEdits && opts.keep.length > 1) {
-        parts.push(jumpCutChain(opts.keep, { v: "0:v", a: "0:a" }, { v: "vcat", a: "acat" }));
-        videoLabel = "[vcat]";
-        audioMap = "[acat]";
-      } else {
-        videoLabel = "[0:v]";
-        audioMap = "0:a?";
-      }
+    function buildArgs(opts: { shots: Shot[]; outDuration: number }) {
+      const assFilter = `ass=${assPath.replace(/\\/g, "/").replace(/:/g, "\\:")}${fontsDir}`;
+      const paneHeight = gameplayFile ? 692 : 1280;
+      const parts: string[] = [
+        shotChain(
+          opts.shots,
+          frame,
+          { width: 720, height: paneHeight },
+          { v: "0:v", a: "0:a" },
+          { v: "vcat", a: "acat" },
+        ),
+      ];
 
       if (gameplayFile) {
-        let top = `${videoLabel}scale=720:692:force_original_aspect_ratio=increase,${biasedCrop(720, 692)}`;
-        if (zoom) top += `,${kenBurnsZoom(720, 692, fps)}`;
-        parts.push(`${top}[top]`);
         parts.push("[1:v]scale=720:588:force_original_aspect_ratio=increase,crop=720:588[bot]");
-        parts.push("[top][bot]vstack=inputs=2[stack]");
+        parts.push("[vcat][bot]vstack=inputs=2[stack]");
         parts.push(`[stack]${assFilter}[vout]`);
       } else {
-        let main = `${videoLabel}scale=720:1280:force_original_aspect_ratio=increase,${biasedCrop(720, 1280)}`;
-        if (zoom) main += `,${kenBurnsZoom(720, 1280, fps)}`;
-        parts.push(`${main}[vpre]`);
-        parts.push(`[vpre]${assFilter}[vout]`);
+        parts.push(`[vcat]${assFilter}[vout]`);
       }
 
-      const filterComplex = parts.filter(Boolean).join(";");
       return [
         "-y",
         "-i",
@@ -212,21 +233,16 @@ export async function processRender(renderId: string) {
         "-t",
         opts.outDuration.toFixed(2),
         "-filter_complex",
-        filterComplex,
+        parts.filter(Boolean).join(";"),
         "-map",
         "[vout]",
         "-map",
-        audioMap,
-        "-c:v",
-        "libx264",
-        "-preset",
-        "ultrafast",
-        "-crf",
-        "23",
+        "[acat]",
+        ...encoder,
         "-c:a",
         "aac",
         "-b:a",
-        "128k",
+        "160k",
         ...(gameplayFile ? ["-shortest"] : []),
         "-movflags",
         "+faststart",
@@ -238,13 +254,20 @@ export async function processRender(renderId: string) {
 
     let finalDuration = outDuration;
     try {
-      await run("ffmpeg", buildArgs({ withEdits: true, keep: plan.keep, assPath: assEditedPath, outDuration }));
+      await run("ffmpeg", buildArgs({ shots, outDuration }), { timeoutMs: 600_000 });
     } catch (renderErr) {
-      console.error("[render] edited pass failed, falling back to plain crop", renderErr);
+      // One static shot over the whole clip: no cuts, no reframing, but a file
+      // the user can post beats a failed render.
+      console.error("[render] edited pass failed, falling back to a single shot", renderErr);
       finalDuration = duration;
+      await writeFile(assPath, buildAss(lines), "utf8");
       await run(
         "ffmpeg",
-        buildArgs({ withEdits: false, keep: [[0, duration]], assPath: assPlainPath, outDuration: duration }),
+        buildArgs({
+          shots: [{ start: 0, end: duration, zoom: 1, center: null }],
+          outDuration: duration,
+        }),
+        { timeoutMs: 600_000 },
       );
     }
 
