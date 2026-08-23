@@ -41,8 +41,30 @@ async function main() {
     });
   }
 
-  // The listener alone does not hold the event loop open.
-  setInterval(() => {}, 1 << 30);
+  // An ngrok session can drop while this process stays perfectly alive, which
+  // means launchd's KeepAlive never fires and the worker is quietly
+  // unreachable — the site keeps queueing jobs nothing will ever pick up.
+  // Prove the round trip through the public URL instead of trusting the SDK,
+  // and exit so the service supervisor restarts us.
+  const publicUrl = listener.url();
+  let misses = 0;
+  setInterval(async () => {
+    if (!publicUrl) return;
+    try {
+      const res = await fetch(`${publicUrl}/health`, { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) throw new Error(`health ${res.status}`);
+      misses = 0;
+    } catch (error) {
+      misses += 1;
+      console.warn(
+        `[tunnel] unreachable (${misses}/3): ${error instanceof Error ? error.message : error}`,
+      );
+      if (misses >= 3) {
+        console.error("[tunnel] session is dead — exiting so the service restarts");
+        process.exit(1);
+      }
+    }
+  }, 60_000);
 }
 
 main().catch((error) => {
