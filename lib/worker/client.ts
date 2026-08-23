@@ -90,6 +90,7 @@ export async function workerHealth(timeoutMs = 8_000) {
       llm?: boolean;
       ffmpeg?: boolean;
       ytdlp?: string | false;
+      proxy?: boolean;
     };
   } catch {
     return null;

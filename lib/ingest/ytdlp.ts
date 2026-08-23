@@ -2,6 +2,23 @@ import { writeFile } from "node:fs/promises";
 import { youtubeCookies, ytdlpPlayerClient, ytdlpProxy } from "@/lib/config";
 
 /**
+ * Substitutes a fresh id into a `{session}` placeholder in YTDLP_PROXY.
+ *
+ * Rotating gateways hand out a new IP per request, which breaks a download
+ * mid-flight — YouTube ties media URLs to the IP that requested them, so the
+ * fragments 403. A session id pins one IP for the whole download. Generating a
+ * new one per call is also what lets a retry land on a different IP.
+ *
+ * DataImpulse spells it `login__cr.us;sessid.{session}:pass@gw…:823`; other
+ * providers use their own parameter, hence the generic placeholder.
+ */
+export function resolveProxy() {
+  const proxy = ytdlpProxy();
+  if (!proxy.includes("{session}")) return proxy;
+  return proxy.replaceAll("{session}", Math.random().toString(36).slice(2, 10));
+}
+
+/**
  * Every yt-dlp invocation goes through here. Kept in one place because the
  * pieces that get forgotten — the proxy above all — are the difference between
  * working and a blanket "Sign in to confirm you're not a bot".
@@ -12,7 +29,7 @@ export function ytdlpBaseArgs() {
     "--extractor-args",
     `youtube:player_client=${ytdlpPlayerClient()}`,
   ];
-  const proxy = ytdlpProxy();
+  const proxy = resolveProxy();
   if (proxy) args.push("--proxy", proxy);
   return args;
 }

@@ -28,6 +28,8 @@ export default function SettingsPage() {
     workerApifyKnown?: boolean;
     workerReachable?: boolean;
     workerFfmpeg?: boolean;
+    workerProxy?: boolean;
+    workerYtdlp?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -94,6 +96,13 @@ export default function SettingsPage() {
                   ? "ffmpeg is present on the worker."
                   : "Render worker URL is set."
                 : "Set CLIP_WORKER_URL + CLIP_WORKER_SECRET for ffmpeg export."}
+            </li>
+            <li>
+              {connections.workerProxy
+                ? `Downloads go through a residential proxy (yt-dlp ${connections.workerYtdlp || "?"}).`
+                : connections.workerReachable
+                  ? "No YTDLP_PROXY on the worker — YouTube will 403 its datacenter IP."
+                  : "Worker unreachable, so proxy status is unknown."}
             </li>
             <li>
               {connections.liveFeed

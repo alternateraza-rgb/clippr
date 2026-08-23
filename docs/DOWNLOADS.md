@@ -32,11 +32,22 @@ A residential exit IP. The worker supports two ways to get one.
 Set on Render:
 
 ```
-YTDLP_PROXY=http://user:pass@proxy.example.com:12321
+YTDLP_PROXY=http://LOGIN__cr.us;sessid.{session}:PASS@gw.dataimpulse.com:823
 ```
 
-Any http/https/socks5 URL with inline credentials works. IPRoyal residential is
-pay-as-you-go and its traffic never expires; roughly $7 for the first GB.
+Any http/https/socks5 URL with inline credentials works. DataImpulse residential
+is $1/GB from a $5 entry and its traffic never expires.
+
+**`{session}` is not optional on a rotating gateway.** Port 823 hands out a new
+IP per request, and a download makes many — YouTube ties media URLs to the IP
+that requested them, so the fragments 403 partway through. `resolveProxy()` in
+`lib/ingest/ytdlp.ts` substitutes a fresh id per invocation, which pins one IP
+for the duration of a download (~30 minutes on DataImpulse) while still giving
+each retry a different one. Other providers spell the parameter differently;
+put `{session}` wherever theirs goes.
+
+`__cr.us` pins the country, which is free on DataImpulse. Drop it to draw from
+the global pool.
 
 Setting this also changes provider order — `ytdlpFirst()` in `lib/config.ts`
 puts yt-dlp ahead of Apify, since a proxied download is both cheaper and more

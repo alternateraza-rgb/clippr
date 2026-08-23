@@ -29,5 +29,7 @@ export async function GET() {
     workerApifyKnown: typeof health?.apify === "boolean",
     workerLlm: health?.llm === true,
     workerFfmpeg: health?.ffmpeg === true,
+    workerProxy: health?.proxy === true,
+    workerYtdlp: typeof health?.ytdlp === "string" ? health.ytdlp : "",
   });
 }
