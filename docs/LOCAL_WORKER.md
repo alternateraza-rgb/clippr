@@ -12,6 +12,8 @@ Users only paste a link on Clipmuse. **Your computer** runs yt-dlp. Pause Render
    - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
    - `LLM_API_KEY` or `OPENAI_API_KEY`
    - `PORT=8787`
+   - `YTDLP_FIRST=true` — download with local yt-dlp instead of Apify. (Not needed
+     if you leave `APIFY_TOKEN` unset here; yt-dlp is used automatically then.)
 3. From the repo: `npm install`
 
 ## Every time you clip (two terminals)
@@ -31,5 +33,8 @@ On **Vercel** set `CLIP_WORKER_URL` to that URL and `CLIP_WORKER_SECRET` to the 
 Check: `curl https://YOUR-TUNNEL/health` → `{"ok":true,...}`
 
 Quick tunnels **change URL when you restart** `cloudflared`. Update Vercel each time, or use a named Cloudflare tunnel later.
+
+If a download still fails, run `yt-dlp -U`. yt-dlp breaks whenever YouTube changes
+something, and an old version looks exactly like a block.
 
 Keep the laptop awake. If this process is down, Studio transcribe/export fails for everyone.

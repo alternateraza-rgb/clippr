@@ -52,6 +52,29 @@ export function apifyToken() {
   return env("APIFY_TOKEN") || env("APIFY_API_TOKEN");
 }
 
+/** YouTube cookies in Netscape format. Only needed for age-restricted videos. */
+export function youtubeCookies() {
+  return env("YOUTUBE_COOKIES_TEXT");
+}
+
+/**
+ * Optional proxy for yt-dlp (http, https, or socks5 URL, credentials inline).
+ * A residential proxy is what gets a datacenter worker past YouTube's 403s.
+ */
+export function ytdlpProxy() {
+  return env("YTDLP_PROXY");
+}
+
+/**
+ * Whether to try yt-dlp before Apify. True when the download would come from an
+ * IP YouTube tolerates: a residential proxy, or a home machine running the
+ * worker without an Apify token.
+ */
+export function ytdlpFirst() {
+  if (env("YTDLP_FIRST").toLowerCase() === "true") return true;
+  return Boolean(ytdlpProxy()) || !hasApify();
+}
+
 export function llmProvider() {
   return (env("LLM_PROVIDER") || "openai").toLowerCase();
 }

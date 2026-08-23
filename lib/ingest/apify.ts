@@ -1,5 +1,5 @@
 import { writeFile } from "node:fs/promises";
-import { apifyToken, hasApify } from "@/lib/config";
+import { apifyToken, hasApify, youtubeCookies } from "@/lib/config";
 
 const ACTOR = "datapipe~youtube-video-downloader";
 
@@ -38,10 +38,16 @@ export async function downloadYoutubeViaApify(
 ): Promise<boolean> {
   if (!hasApify()) return false;
   const token = apifyToken();
-  const input =
-    kind === "audio"
+  const cookiesText = youtubeCookies();
+  const input = {
+    ...(kind === "audio"
       ? { videoUrls: [youtubeUrl(videoId)], format: "m4a" }
-      : { videoUrls: [youtubeUrl(videoId)], quality: "720p", format: "mp4" };
+      : { videoUrls: [youtubeUrl(videoId)], quality: "720p", format: "mp4" }),
+    // Optional per the actor's input schema, and only for age-restricted
+    // videos — plain 403s are IP blocks, which cookies do not fix. See
+    // YTDLP_PROXY in .env.example for those.
+    ...(cookiesText ? { cookiesText } : {}),
+  };
   const start = await fetch(
     `https://api.apify.com/v2/acts/${ACTOR}/runs?token=${encodeURIComponent(token)}`,
     {

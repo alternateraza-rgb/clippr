@@ -16,3 +16,10 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: APIFY_TOKEN
+        sync: false
+      # Residential proxy URL. Set this and the worker downloads with yt-dlp
+      # directly instead of paying Apify — without it, Render's datacenter IP
+      # gets 403'd by YouTube.
+      - key: YTDLP_PROXY
+        sync: false
