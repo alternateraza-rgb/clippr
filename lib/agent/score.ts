@@ -1,7 +1,7 @@
 import { captionLinesForRange } from "@/lib/agent/compose";
 import { heuristicCandidates } from "@/lib/agent/heuristic";
 import { RUBRIC } from "@/lib/agent/rubric";
-import { buildSegments, TARGET_MIN_S, totalDuration } from "@/lib/agent/story";
+import { buildSegments, TARGET_MAX_S, TARGET_MIN_S, totalDuration } from "@/lib/agent/story";
 import { timedScript, type TranscriptResult } from "@/lib/agent/transcript";
 import { hasLlm } from "@/lib/config";
 import { completeJson } from "@/lib/llm/complete";
@@ -101,11 +101,20 @@ async function scoreWithLlm(
   }
   const candidates = toStory(parsed, transcript.words);
   if (!candidates.length) throw new Error("LLM returned no usable segments");
-  // A short story is a failed story: the model found moments but not enough of
-  // them to carry a topic. Worth one more attempt before shipping it.
-  const seconds = totalDuration(candidates[0].segments ?? []);
-  if (seconds < TARGET_MIN_S) {
-    throw new Error(`Story is only ${Math.round(seconds)}s of tape`);
+  // Length is enforced by sending the measurement back to the model, not by
+  // trimming: every span ends where a sentence ends, and shaving seconds off
+  // that end is precisely what made assembled clips cut mid-thought.
+  const segments = candidates[0].segments ?? [];
+  const seconds = totalDuration(segments);
+  // Deliberately wider than the 50-60s brief. Asking again for length costs
+  // story: the model answers "too long" by dropping beats, so a corrected clip
+  // arrives as two fragments where the first answer had a full arc. A 68s clip
+  // with a setup and a payoff beats a 55s clip with neither.
+  if (seconds < TARGET_MIN_S - 6 || seconds > TARGET_MAX_S + 12) {
+    const each = segments.map((s) => `${Math.round(s.end - s.start)}s`).join(" + ");
+    throw new Error(
+      `your segments measured ${each} = ${Math.round(seconds)}s total, but the clip must be ${TARGET_MIN_S}-${TARGET_MAX_S}s`,
+    );
   }
   return { candidates, model, tokens };
 }
@@ -132,12 +141,12 @@ export async function scoreTranscript(
 
   const started = Date.now();
   let last: unknown;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const extra =
         attempt === 0
           ? undefined
-          : `Previous reply was unusable (${last instanceof Error ? last.message : "bad shape"}). Return one JSON object with "topic", "hook", "whyItClips", "scores" and a "segments" array of 3-6 spans in chronological order totalling 50-60 seconds of tape. start and end must be JSON numbers in seconds (522.4), never "8:42", and every segment needs a verbatim "quote" of its opening words.`;
+          : `Your previous answer was rejected: ${last instanceof Error ? last.message : "bad shape"}.\n\nThe span kept is from startQuote to endQuote — the numbers are only hints, so quoting a later endQuote is what makes a segment longer and quoting an earlier one is what makes it shorter. Keep every segment ending on a finished thought. Return the same JSON shape, with 3-6 chronological segments of 8-20 seconds each.`;
       const { candidates, model, tokens } = await scoreWithLlm(transcript, niche, extra);
       return {
         candidates,

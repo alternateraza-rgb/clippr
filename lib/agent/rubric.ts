@@ -22,10 +22,18 @@ Work in this order:
 
 Hard requirements:
 - Total duration across all segments: 50 to 60 seconds. This is a hard range.
-- Each segment: at least 6 seconds, a complete thought, starting and ending on sentence boundaries. Never cut mid-sentence.
+- Each segment: 8 to 20 seconds, and a complete thought.
 - Segments must be in chronological order and must not overlap.
-- For each segment, "quote" must be the LITERAL, VERBATIM first words of that span exactly as they appear in the transcript. This is used to locate the span precisely — never paraphrase it.
-- start and end must be JSON numbers in seconds copied from the transcript (example: 522.4), never clock strings like "8:42".
+
+THE MOST IMPORTANT RULE. Each segment is cut out of the tape at exactly the words you quote, so you decide where every cut lands:
+- "startQuote" is the LITERAL, VERBATIM first words of the segment.
+- "endQuote" is the LITERAL, VERBATIM last words of the segment — 4 to 8 words, copied exactly from the transcript.
+
+The transcript has little or no punctuation, so nothing else can tell us where a sentence ends. If your endQuote stops mid-thought, the clip audibly cuts mid-thought and the video is ruined. Read the words after your endQuote and confirm the thought is genuinely finished there — that the next words begin something new rather than completing what you just cut.
+
+Copy both quotes exactly as they appear, including any repeated or stumbled words. Do not paraphrase, do not tidy them up, do not add punctuation that is not there.
+
+- start and end must be JSON numbers in seconds copied from the transcript (example: 522.4), never clock strings like "8:42". They are used only as a hint for locating your quotes.
 
 Also return:
 - topic: what this video is about, one specific line, written as something a viewer would understand
@@ -42,4 +50,4 @@ Score the assembled clip 0-100 on:
 Return exactly one clip. Score it honestly: if the tape is weak, say so in the scores rather than inflating them.
 
 Respond with JSON:
-{"topic":"","hook":"","whyItClips":"","scores":{"hook":0,"emotion":0,"selfContained":0,"quotability":0,"payoff":0},"segments":[{"start":0,"end":0,"quote":"","role":"setup"}]}`;
+{"topic":"","hook":"","whyItClips":"","scores":{"hook":0,"emotion":0,"selfContained":0,"quotability":0,"payoff":0},"segments":[{"start":0,"end":0,"startQuote":"","endQuote":"","role":"setup"}]}`;

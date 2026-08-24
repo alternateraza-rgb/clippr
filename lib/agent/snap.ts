@@ -10,6 +10,44 @@ function normalize(text: string) {
  * Timestamps from a model drift; the words it quotes do not. Locating the
  * quote is what keeps a segment on the line it was chosen for.
  */
+/**
+ * First and last word index of `phrase`, so a caller can end a segment exactly
+ * where the quoted line ends.
+ */
+export function findPhraseSpan(
+  words: WordTiming[],
+  phrase: string,
+  near?: number,
+): { from: number; to: number } | null {
+  const from = findPhrase(words, phrase, near);
+  if (from < 0) return null;
+  const tokens = normalize(phrase)
+    .split(" ")
+    .filter((t) => t.length > 2);
+  // Walk forward over the same tokens to find where the quote stops.
+  //
+  // Skips are bounded: an unbounded lenient walk lets a short token like "it"
+  // match a word far past the end of the quote, which dragged segment ends
+  // several words beyond the sentence the model actually chose.
+  let matched = 0;
+  let skips = 0;
+  let k = from;
+  let last = from;
+  while (matched < tokens.length && k < words.length && skips <= 2) {
+    const word = normalize(words[k].text);
+    const token = tokens[matched];
+    if (word && (word === token || word.includes(token) || token.includes(word))) {
+      matched += 1;
+      last = k;
+      skips = 0;
+    } else if (word) {
+      skips += 1;
+    }
+    k += 1;
+  }
+  return { from, to: last };
+}
+
 export function findPhrase(words: WordTiming[], phrase: string, near?: number): number {
   if (!words.length) return -1;
   const tokens = normalize(phrase)
