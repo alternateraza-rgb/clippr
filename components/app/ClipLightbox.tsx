@@ -64,9 +64,14 @@ export function ClipLightbox({
               className="max-h-[70vh] rounded-[var(--radius-panel,22px)] bg-black shadow-pop"
             />
 
-            <div className="flex w-full max-w-[420px] flex-col items-center gap-3 text-center">
-              {render.hook ? (
+            <div className="flex w-full max-w-[46ch] flex-col items-center gap-3 text-center">
+              {render.topic ? (
+                <p className="display text-[19px] leading-snug text-on-brand">{render.topic}</p>
+              ) : render.hook ? (
                 <p className="text-[15px] leading-snug text-on-brand">{render.hook}</p>
+              ) : null}
+              {render.why ? (
+                <p className="text-[13.5px] leading-relaxed text-on-brand/70">{render.why}</p>
               ) : null}
               <Pill
                 variant="ghost"

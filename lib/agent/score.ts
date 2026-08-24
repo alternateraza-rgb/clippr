@@ -1,8 +1,7 @@
 import { captionLinesForRange } from "@/lib/agent/compose";
 import { heuristicCandidates } from "@/lib/agent/heuristic";
 import { RUBRIC } from "@/lib/agent/rubric";
-import { snapRange, tightenRange } from "@/lib/agent/snap";
-import { pickOffset } from "@/lib/agent/time";
+import { buildSegments, TARGET_MIN_S, totalDuration } from "@/lib/agent/story";
 import { timedScript, type TranscriptResult } from "@/lib/agent/transcript";
 import { hasLlm } from "@/lib/config";
 import { completeJson } from "@/lib/llm/complete";
@@ -16,57 +15,72 @@ export type ScoreMeta = {
   source: "llm" | "heuristic";
 };
 
+/**
+ * Models answer "score 0-100" on a 0-10 scale often enough that a clip scoring
+ * 8 out of 100 is a parsing artefact, not a judgement. If every score would be
+ * a plausible 0-10 rating, read it as one.
+ */
+function normalizeScores(scores: ScoreBreakdown): ScoreBreakdown {
+  const values = Object.values(scores);
+  if (!values.every((v) => v > 0 && v <= 10)) return scores;
+  return Object.fromEntries(
+    Object.entries(scores).map(([key, value]) => [key, Math.min(100, value * 10)]),
+  ) as ScoreBreakdown;
+}
+
 function clampScore(n: unknown) {
   const v = Number(n);
   if (!Number.isFinite(v)) return 50;
   return Math.max(0, Math.min(100, Math.round(v)));
 }
 
-function asRows(parsed: unknown): Array<Record<string, unknown>> {
-  if (Array.isArray(parsed)) {
-    return parsed.filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object");
-  }
-  if (parsed && typeof parsed === "object") {
-    const o = parsed as Record<string, unknown>;
-    for (const key of ["candidates", "clips", "windows", "results"]) {
-      if (Array.isArray(o[key])) return asRows(o[key]);
-    }
-  }
-  return [];
-}
+/**
+ * One clip, assembled from the spans the model chose.
+ *
+ * Everything the model says about timing is treated as a suggestion — the
+ * segments are re-anchored to the transcript before they become a clip.
+ */
+function toStory(raw: unknown, words: WordTiming[]): ClipCandidate[] {
+  const root = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  // Models wrap the answer differently depending on the day.
+  const story = (Array.isArray(root.candidates) && root.candidates[0] && typeof root.candidates[0] === "object"
+    ? (root.candidates[0] as Record<string, unknown>)
+    : root) as Record<string, unknown>;
 
-function toCandidates(raw: unknown, words: WordTiming[]): ClipCandidate[] {
-  return asRows(raw)
-    .map((c, i) => {
-      const startRaw = pickOffset(c, ["start", "start_s", "startSec", "startTime", "from", "t0"]);
-      const endRaw = pickOffset(c, ["end", "end_s", "endSec", "endTime", "to", "t1"]);
-      if (startRaw == null || endRaw == null) return null;
-      const hook = String(c.hook || c.title || "").slice(0, 220);
-      const snapped = snapRange(startRaw, Math.max(startRaw + 45, endRaw), hook, words);
-      const tightened = tightenRange(words, snapped.start, snapped.end);
-      const start = tightened.start;
-      const finish = tightened.end;
-      const nested = (c.scores && typeof c.scores === "object" ? c.scores : c) as Record<string, unknown>;
-      const scores: ScoreBreakdown = {
-        hook: clampScore(nested.hook),
-        emotion: clampScore(nested.emotion),
-        selfContained: clampScore(nested.selfContained ?? nested.self_contained),
-        quotability: clampScore(nested.quotability ?? nested.quotable),
-        payoff: clampScore(nested.payoff),
-      };
-      return {
-        id: `c-${i + 1}`,
-        start: Math.max(0, start),
-        end: finish,
-        hook,
-        whyItClips: String(c.whyItClips || c.why_it_clips || c.reason || "").slice(0, 400),
-        score: weightedScore(scores),
-        scores,
-        captionLines: captionLinesForRange(words, start, finish),
-      } satisfies ClipCandidate;
-    })
-    .filter((c): c is ClipCandidate => Boolean(c))
-    .slice(0, 3);
+  const segments = buildSegments(story.segments ?? story.moments ?? story.spans, words);
+  if (!segments.length) return [];
+
+  const nested = (story.scores && typeof story.scores === "object" ? story.scores : story) as Record<
+    string,
+    unknown
+  >;
+  const scores = normalizeScores({
+    hook: clampScore(nested.hook),
+    emotion: clampScore(nested.emotion),
+    selfContained: clampScore(nested.selfContained ?? nested.self_contained),
+    quotability: clampScore(nested.quotability ?? nested.quotable),
+    payoff: clampScore(nested.payoff),
+  });
+
+  const start = segments[0].start;
+  const end = segments[segments.length - 1].end;
+
+  return [
+    {
+      id: "story-1",
+      start,
+      end,
+      hook: String(story.hook || segments[0].quote || "").slice(0, 220),
+      whyItClips: String(story.whyItClips || story.why_it_clips || story.reason || "").slice(0, 500),
+      topic: String(story.topic || story.title || "").slice(0, 200),
+      segments,
+      score: weightedScore(scores),
+      scores,
+      // Captions are regenerated from the assembled audio at render time; these
+      // only carry the first segment so the export payload is not empty.
+      captionLines: captionLinesForRange(words, start, segments[0].end),
+    },
+  ];
 }
 
 async function scoreWithLlm(
@@ -85,8 +99,14 @@ async function scoreWithLlm(
   } catch {
     throw new Error("LLM returned invalid JSON");
   }
-  const candidates = toCandidates(parsed, transcript.words);
-  if (!candidates.length) throw new Error("LLM returned no usable clip windows");
+  const candidates = toStory(parsed, transcript.words);
+  if (!candidates.length) throw new Error("LLM returned no usable segments");
+  // A short story is a failed story: the model found moments but not enough of
+  // them to carry a topic. Worth one more attempt before shipping it.
+  const seconds = totalDuration(candidates[0].segments ?? []);
+  if (seconds < TARGET_MIN_S) {
+    throw new Error(`Story is only ${Math.round(seconds)}s of tape`);
+  }
   return { candidates, model, tokens };
 }
 
@@ -117,7 +137,7 @@ export async function scoreTranscript(
       const extra =
         attempt === 0
           ? undefined
-          : 'Previous reply was unusable. start and end must be JSON numbers in seconds (522.4), never "8:42". Return {"candidates":[...]} with exactly 3 clips, each 50-60 seconds long.';
+          : `Previous reply was unusable (${last instanceof Error ? last.message : "bad shape"}). Return one JSON object with "topic", "hook", "whyItClips", "scores" and a "segments" array of 3-6 spans in chronological order totalling 50-60 seconds of tape. start and end must be JSON numbers in seconds (522.4), never "8:42", and every segment needs a verbatim "quote" of its opening words.`;
       const { candidates, model, tokens } = await scoreWithLlm(transcript, niche, extra);
       return {
         candidates,

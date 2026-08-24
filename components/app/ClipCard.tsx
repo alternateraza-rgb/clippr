@@ -124,13 +124,16 @@ export function ClipCard({
 
         <div className="absolute inset-x-0 bottom-0 p-3.5">
           <p className="line-clamp-2 text-[13.5px] font-medium leading-snug text-on-brand">
-            {render.hook || "Untitled clip"}
+            {render.topic || render.hook || "Untitled clip"}
           </p>
         </div>
       </div>
 
       <p className="mt-2.5 px-0.5 text-[12px] text-muted">
         {formatRelativeDate(render.createdAt)}
+        {render.segmentCount && render.segmentCount > 1
+          ? ` · ${render.segmentCount} moments`
+          : ""}
       </p>
     </motion.article>
   );

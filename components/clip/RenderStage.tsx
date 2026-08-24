@@ -16,8 +16,8 @@ export type StageId = "read" | "transcribe" | "choose" | "cut" | "edit" | "done"
 const STAGES: { id: StageId; label: string; detail: string; at: number }[] = [
   { id: "read", label: "Reading the video", detail: "Pulling the tape and its metadata", at: 0 },
   { id: "transcribe", label: "Listening to all of it", detail: "Every word, with timings", at: 8 },
-  { id: "choose", label: "Finding the best minute", detail: "Comparing the strongest moments", at: 20 },
-  { id: "cut", label: "Pulling the clip", detail: "Downloading just that window", at: 30 },
+  { id: "choose", label: "Deciding what it is about", detail: "Picking a topic and the moments that tell it", at: 20 },
+  { id: "cut", label: "Gathering the moments", detail: "Pulling each piece from the tape", at: 30 },
   { id: "edit", label: "Editing", detail: "Cuts, framing, captions on the beat", at: 48 },
 ];
 

@@ -1,11 +1,18 @@
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAdminClient } from "../../lib/supabase/admin";
 import { captionLinesForRange } from "../../lib/agent/compose";
 import { jumpCutDuration, planJumpCuts, remapCaptionLines, type Interval } from "../../lib/agent/jumpcuts";
-import type { CaptionLine, CaptionPreset, RenderStatus, WordTiming } from "../../lib/agent/types";
+import type {
+  CaptionLine,
+  CaptionPreset,
+  ClipCandidate,
+  RenderStatus,
+  StorySegment,
+  WordTiming,
+} from "../../lib/agent/types";
 import { buildAss } from "./ass";
 import { shotChain } from "./filters";
 import { planShots, type Shot } from "../../lib/agent/shots";
@@ -23,6 +30,7 @@ type RenderRow = {
   caption_preset: CaptionPreset | null;
   caption_lines: CaptionLine[] | null;
   gameplay: string | null;
+  moment: ClipCandidate | null;
 };
 
 async function setStatus(
@@ -125,15 +133,57 @@ export async function processRender(renderId: string) {
 
   try {
     await setStatus(renderId, { status: "downloading", progress: 8, error: null });
-    const duration = Math.max(1, end - start);
-    const sourceFile = join(dir, "full.mp4");
-    const raw = join(dir, "raw.mp4");
-    // Ask for just the clip window. A provider that can only return the whole
-    // video reports offset 0, and the cut below stays correct either way.
-    const source = await downloadSource(row.video_id, sourceFile, "video", { start, end });
-    await cutReencode(sourceFile, raw, start - source.offset, duration, "video");
 
-    await setStatus(renderId, { status: "downloading", progress: 25 });
+    // The clip is a story assembled from spans across the tape. A render with
+    // no segments is the single-window case, which is just a story of one.
+    const segments: StorySegment[] =
+      row.moment?.segments?.length
+        ? row.moment.segments
+        : [{ start, end, quote: "", role: "setup" }];
+
+    const raw = join(dir, "raw.mp4");
+    const pieces: string[] = [];
+    /** Seam positions on the assembled timeline, for forcing shot changes. */
+    const seams: number[] = [];
+    let assembled = 0;
+
+    for (const [index, segment] of segments.entries()) {
+      const from = Math.max(0, segment.start);
+      const span = Math.max(1, segment.end - from);
+      const sourceFile = join(dir, `src-${index}.mp4`);
+      const piece = join(dir, `piece-${index}.mp4`);
+      // Ask for just this window. A provider that can only return the whole
+      // video reports offset 0, and the cut below stays correct either way.
+      const source = await downloadSource(row.video_id, sourceFile, "video", {
+        start: from,
+        end: segment.end,
+      });
+      await cutReencode(sourceFile, piece, from - source.offset, span, "video");
+      await rm(sourceFile, { force: true }).catch(() => null);
+      pieces.push(piece);
+      if (index > 0) seams.push(assembled);
+      assembled += span;
+      // Downloads dominate the early wait, so spread the checkpoints over them.
+      await setStatus(renderId, {
+        status: "downloading",
+        progress: 8 + Math.round(((index + 1) / segments.length) * 17),
+      });
+    }
+
+    if (pieces.length === 1) {
+      await rename(pieces[0], raw);
+    } else {
+      // Concat demuxer is safe here because cutReencode already normalised
+      // every piece to the same codec, resolution and rate.
+      const list = join(dir, "pieces.txt");
+      await writeFile(list, pieces.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n"), "utf8");
+      await run("ffmpeg", ["-y", "-f", "concat", "-safe", "0", "-i", list, "-c", "copy", raw], {
+        timeoutMs: 300_000,
+      });
+      console.info(`[render] assembled ${pieces.length} segments (${assembled.toFixed(1)}s)`);
+    }
+    const duration = assembled;
+
     await setStatus(renderId, { status: "transcribing", progress: 38 });
     const audio = join(dir, "audio.mp3");
     await run("ffmpeg", ["-y", "-i", raw, "-vn", "-ac", "1", "-ar", "16000", "-b:a", "64k", audio]);
@@ -185,7 +235,7 @@ export async function processRender(renderId: string) {
     // Framing follows the speaker where we can see them; where we cannot, the
     // shots still cut, just centred.
     const track = await trackSpeaker(raw);
-    const shots = planShots(plan.keep, words, track.centerAt);
+    const shots = planShots(plan.keep, words, track.centerAt, seams);
     await setStatus(renderId, { status: "rendering", progress: 58 });
     console.info(
       `[render] ${shots.length} shots · ${track.samples} face samples · ${outDuration.toFixed(1)}s`,

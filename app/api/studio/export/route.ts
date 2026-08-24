@@ -37,10 +37,16 @@ async function which(bin: string) {
   }
 }
 
-function clampRange(start: number, end: number) {
+/**
+ * `start_s`/`end_s` are the outer span of the clip. For a story assembled from
+ * spans across the tape that span is legitimately minutes wide, so the 75s
+ * ceiling only applies when there is a single window to clamp — otherwise it
+ * would record a story that runs 0:04 to 10:52 as ending at 1:19.
+ */
+function clampRange(start: number, end: number, assembled: boolean) {
   const s = Math.max(0, start);
   let e = Math.max(s + 8, end);
-  if (e - s > 75) e = s + 75;
+  if (!assembled && e - s > 75) e = s + 75;
   return { start: s, end: e };
 }
 
@@ -60,7 +66,7 @@ export async function POST(request: Request) {
     return Response.json({ message: "Missing composition" }, { status: 400 });
   }
 
-  const range = clampRange(body.start, body.end);
+  const range = clampRange(body.start, body.end, (body.candidate?.segments?.length ?? 0) > 1);
   const user = await getSessionUser();
 
   if (user) {

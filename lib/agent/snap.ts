@@ -4,22 +4,22 @@ function normalize(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-/** Move an LLM window onto the transcript phrase it quoted, so 0:02 is not used for a line at 45:12. */
-export function snapRange(
-  start: number,
-  end: number,
-  hook: string,
-  words: WordTiming[],
-): { start: number; end: number } {
-  if (!words.length) return { start, end };
-  const tokens = normalize(hook)
+/**
+ * Index of the word where `phrase` starts, or -1.
+ *
+ * Timestamps from a model drift; the words it quotes do not. Locating the
+ * quote is what keeps a segment on the line it was chosen for.
+ */
+export function findPhrase(words: WordTiming[], phrase: string, near?: number): number {
+  if (!words.length) return -1;
+  const tokens = normalize(phrase)
     .split(" ")
     .filter((t) => t.length > 2)
     .slice(0, 7);
-  if (tokens.length < 3) return { start, end };
+  if (tokens.length < 3) return -1;
 
   const texts = words.map((w) => normalize(w.text));
-  let best = -1;
+  const hits: number[] = [];
   for (let i = 0; i < texts.length; i++) {
     let matched = 0;
     let k = i;
@@ -38,19 +38,17 @@ export function snapRange(
       if (matched === 0) break;
       k += 1;
     }
-    if (matched >= Math.min(4, tokens.length)) {
-      best = i;
-      break;
-    }
+    if (matched >= Math.min(4, tokens.length)) hits.push(i);
   }
-  if (best < 0) return { start, end };
-
-  const from = words[best].start;
-  const want = Math.max(45, Math.min(65, end - start || 55));
-  let to = from + want;
-  const last = words.find((w) => w.start >= to) ?? words[words.length - 1];
-  to = Math.max(from + 30, Math.min(last.end, from + 70));
-  return { start: from, end: to };
+  if (!hits.length) return -1;
+  if (near == null) return hits[0];
+  const target = near;
+  // People repeat themselves, so a phrase can match in several places. The
+  // model's timestamp is rough but it is not random — take the match nearest
+  // to it rather than the first one in the tape.
+  return hits.reduce((best, i) =>
+    Math.abs(words[i].start - target) < Math.abs(words[best].start - target) ? i : best,
+  );
 }
 
 const FILLER_WORDS = new Set([

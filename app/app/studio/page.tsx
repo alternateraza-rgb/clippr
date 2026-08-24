@@ -36,7 +36,14 @@ function StudioInner() {
     setStage(next);
     advance(progressFor(next));
   };
-  const [clip, setClip] = useState<{ url: string; poster: string | null; hook: string } | null>(null);
+  const [clip, setClip] = useState<{
+    url: string;
+    poster: string | null;
+    hook: string;
+    topic: string;
+    why: string;
+    segments: number;
+  } | null>(null);
 
   const videoId = parseYouTubeId(raw);
 
@@ -162,7 +169,14 @@ function StudioInner() {
       if (render?.status === "ready" && render.downloadUrl) {
         markDownloaded(payload.renderId);
         advance(100);
-        setClip({ url: render.downloadUrl, poster: render.posterUrl ?? null, hook: candidate.hook });
+        setClip({
+          url: render.downloadUrl,
+          poster: render.posterUrl ?? null,
+          hook: candidate.hook,
+          topic: candidate.topic ?? "",
+          why: candidate.whyItClips ?? "",
+          segments: candidate.segments?.length ?? 1,
+        });
         setStage("done");
         setPhase("done");
         // The shell downloads finished clips too, but only on its own poll —
@@ -347,16 +361,28 @@ function StudioInner() {
               />
             </div>
 
-            {clip.hook ? (
-              <motion.p
-                className="mt-6 max-w-[40ch] text-center text-[15px] leading-snug text-ink"
-                initial={reduced ? false : { opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ ...base, delay: 0.3 }}
-              >
-                “{clip.hook}”
-              </motion.p>
-            ) : null}
+            <motion.div
+              className="mt-7 w-full max-w-[46ch] text-center"
+              initial={reduced ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...base, delay: 0.3 }}
+            >
+              {clip.topic ? (
+                <h2 className="display text-[20px] leading-snug text-ink">{clip.topic}</h2>
+              ) : clip.hook ? (
+                <h2 className="display text-[20px] leading-snug text-ink">“{clip.hook}”</h2>
+              ) : null}
+
+              {clip.why ? (
+                <p className="mt-3 text-[14px] leading-relaxed text-body">{clip.why}</p>
+              ) : null}
+
+              {clip.segments > 1 ? (
+                <p className="mt-3 text-[12.5px] text-muted">
+                  Built from {clip.segments} moments across the video
+                </p>
+              ) : null}
+            </motion.div>
 
             <motion.div
               className="mt-6 flex items-center gap-3"

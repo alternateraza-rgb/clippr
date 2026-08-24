@@ -369,6 +369,11 @@ function asRender(row: {
     createdAt: row.created_at,
     finishedAt: row.finished_at,
     hook: row.moment?.hook,
+    // The candidate has been stored whole since the beginning; only `hook` was
+    // ever read back out. The topic and the reasoning were already here.
+    topic: row.moment?.topic,
+    why: row.moment?.whyItClips,
+    segmentCount: row.moment?.segments?.length,
   };
 }
 

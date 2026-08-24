@@ -33,9 +33,14 @@ function wordsIn(words: WordTiming[], start: number, end: number) {
  * Cut points inside one kept span: sentence boundaries first, then forced
  * splits so no framing outstays MAX_SHOT_S.
  */
-function boundaries(words: WordTiming[], [start, end]: Interval): number[] {
+function boundaries(words: WordTiming[], [start, end]: Interval, seams: number[] = []): number[] {
   const inside = wordsIn(words, start, end);
   const points: number[] = [start];
+
+  // A seam is where the tape jumps to another part of the video. Always cut
+  // there: holding one framing across a jump is what makes an assembled clip
+  // look broken rather than edited.
+  const forced = seams.filter((t) => t > start && t < end).sort((a, b) => a - b);
 
   for (let i = 0; i < inside.length - 1; i++) {
     const gap = inside[i + 1].start - inside[i].end;
@@ -44,6 +49,11 @@ function boundaries(words: WordTiming[], [start, end]: Interval): number[] {
       if (at - points[points.length - 1] >= MIN_SHOT_S) points.push(at);
     }
   }
+
+  for (const at of forced) {
+    if (!points.some((p) => Math.abs(p - at) < 0.25)) points.push(at);
+  }
+  points.sort((a, b) => a - b);
 
   // Long unbroken talking still needs cuts, or the shot sits static for the
   // whole clip — which is the thing that makes these read as unedited.
@@ -73,11 +83,12 @@ export function planShots(
   keep: Interval[],
   words: WordTiming[],
   centerAt: (start: number, end: number) => number | null = () => null,
+  seams: number[] = [],
 ): Shot[] {
   // Pass one: where the cuts fall, and how hot each resulting shot is.
   const spans: { start: number; end: number; heat: number }[] = [];
   for (const span of keep) {
-    const points = boundaries(words, span);
+    const points = boundaries(words, span, seams);
     for (let i = 0; i < points.length - 1; i++) {
       const start = points[i];
       const end = points[i + 1];

@@ -54,8 +54,18 @@ export type ScoreBreakdown = {
   payoff: number;
 };
 
+/** One span of the source tape, and the job it does in the story. */
+export type StorySegment = {
+  start: number;
+  end: number;
+  /** Verbatim opening words, used to anchor the span to the transcript. */
+  quote: string;
+  role: "setup" | "beat" | "turn" | "payoff";
+};
+
 export type ClipCandidate = {
   id: string;
+  /** Outer span: the first segment's start to the last one's end. */
   start: number;
   end: number;
   hook: string;
@@ -63,6 +73,13 @@ export type ClipCandidate = {
   score: number;
   scores: ScoreBreakdown;
   captionLines: CaptionLine[];
+  /** What the clip is about, in the model's words. */
+  topic?: string;
+  /**
+   * The spans that make up the clip, in the order they play. A single segment
+   * spanning start..end is the floor, and is what a one-window clip looks like.
+   */
+  segments?: StorySegment[];
 };
 
 export type CompositionSpec = {
@@ -125,6 +142,9 @@ export type ClipRender = {
   createdAt: string;
   finishedAt?: string | null;
   hook?: string;
+  topic?: string;
+  why?: string;
+  segmentCount?: number;
 };
 
 export type Profile = {
