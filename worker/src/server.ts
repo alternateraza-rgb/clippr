@@ -47,6 +47,9 @@ async function pumpTranscribe() {
   transcribing = false;
 }
 
+/** Longer than any healthy render, shorter than a working day. */
+const RENDER_LIMIT_MS = 15 * 60 * 1000;
+
 function enqueue(id: string) {
   if (!id) return;
   if (queue.includes(id) || seen.has(id)) return;
@@ -62,7 +65,16 @@ async function pump() {
     if (!id) continue;
     seen.add(id);
     try {
-      await processRender(id);
+      // A hard ceiling on one render. Individual subprocesses have their own
+      // timeouts, but this is the guarantee that matters: whatever goes wrong
+      // inside a job, the queue behind it keeps moving. A worker that wedged on
+      // one stalled download for twenty-six hours is what this prevents.
+      await Promise.race([
+        processRender(id),
+        new Promise((_, fail) =>
+          setTimeout(() => fail(new Error("Render exceeded its time limit")), RENDER_LIMIT_MS),
+        ),
+      ]);
     } catch (error) {
       console.error("[worker] render failed", id, error);
     } finally {
