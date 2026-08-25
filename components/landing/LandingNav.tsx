@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Pill } from "@/components/ui/Pill";
 import { Wordmark } from "@/components/ui/Wordmark";
 
@@ -16,6 +17,9 @@ export function LandingNav() {
           <a href="#faq" className="hover:text-ink">
             FAQ
           </a>
+          <Link href="/pricing" className="hover:text-ink">
+            Pricing
+          </Link>
         </nav>
         <div className="flex items-center gap-2">
           <Pill href="/login" variant="text" className="hidden sm:inline-flex">
