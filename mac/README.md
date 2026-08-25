@@ -10,18 +10,25 @@ without a terminal.
 ```
 
 Builds `Clipmuse.app` and puts it in `~/Applications`. Open it from Spotlight
-or Finder; a scissors icon appears in the menu bar.
+or Finder: a window appears with the current status and one big button.
 
-## What the icon means
+## The window
 
-| Icon | Meaning |
+A coloured dot and a line telling you what is true right now:
+
+| Dot | Meaning |
 |---|---|
-| Filled, red | Worker running and reachable from the web |
-| Hollow, grey | Stopped, or the tunnel is down |
-| Hourglass | Starting or stopping |
+| Green | Worker running (and reachable from the web, if a tunnel is configured) |
+| Red | Stopped — clips cannot be made |
+| Orange | Starting or stopping |
 
-Click it for the menu: current status, **Start** or **Stop**, copy the public
-URL, and open the logs folder.
+One button underneath, which reads **Start the worker** or **Stop the worker**
+depending on which one applies. Plus copy the public URL and open the logs.
+
+There is a small status dot in the menu bar too, but the window is the app.
+It was menu-bar only at first and that was wrong: with `LSUIElement` there is
+no dock icon and no window, so double-clicking looked like nothing happened —
+and on a notched Mac a full menu bar hides the icon completely.
 
 ## What the buttons actually do
 

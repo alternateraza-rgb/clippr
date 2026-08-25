@@ -35,8 +35,6 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>Clipmuse</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
-  <!-- Menu-bar only: no dock icon, no window on launch. -->
-  <key>LSUIElement</key><true/>
   <!-- The worker is plain http on localhost. -->
   <key>NSAppTransportSecurity</key>
   <dict><key>NSAllowsLocalNetworking</key><true/></dict>
