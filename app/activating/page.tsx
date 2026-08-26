@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { Activating } from "@/components/billing/Activating";
 import { Wordmark } from "@/components/ui/Wordmark";
@@ -17,7 +18,12 @@ export default async function ActivatingPage() {
         </div>
       </header>
       <div className="flex flex-1 items-center justify-center px-6 py-14">
-        <Activating />
+        {/* Activating reads the payment id out of the query string, which is a
+            client-only read; without this the whole route would opt out of
+            prerendering to get it. */}
+        <Suspense fallback={null}>
+          <Activating />
+        </Suspense>
       </div>
     </div>
   );

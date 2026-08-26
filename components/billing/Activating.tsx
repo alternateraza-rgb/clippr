@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Check } from "lucide-react";
 import { Pill } from "@/components/ui/Pill";
 import { LEGAL_CONTACT } from "@/lib/legal";
@@ -19,11 +19,31 @@ const GIVE_UP_MS = 45_000;
  */
 export function Activating() {
   const router = useRouter();
+  const params = useSearchParams();
+  const paymentId = params.get("payment_id") ?? params.get("receipt_id");
   const [state, setState] = useState<"waiting" | "ready" | "slow">("waiting");
 
   useEffect(() => {
     let cancelled = false;
     const startedAt = Date.now();
+
+    /**
+     * Whop names the payment in the URL it sends people back with, so the app
+     * can ask about that payment directly instead of only waiting to be told.
+     * Runs alongside the poll: whichever answers first wins.
+     */
+    const confirm = async () => {
+      if (!paymentId) return;
+      try {
+        await fetch("/api/billing/confirm", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ paymentId }),
+        });
+      } catch {
+        // The poll is still running; this was the shortcut, not the only path.
+      }
+    };
 
     const poll = async () => {
       try {
@@ -47,12 +67,13 @@ export function Activating() {
       timer = setTimeout(poll, 2000);
     };
 
+    void confirm();
     let timer = setTimeout(poll, 600);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [router]);
+  }, [router, paymentId]);
 
   return (
     <div className="mx-auto w-full max-w-[420px] text-center">
@@ -82,7 +103,15 @@ export function Activating() {
 
       {state === "slow" ? (
         <div className="mt-7 flex flex-col items-center gap-3">
-          <Pill onClick={() => window.location.reload()}>Check again</Pill>
+          <Pill
+            onClick={() => {
+              setState("waiting");
+              // Remounts the effect, which re-runs both the confirm and the poll.
+              router.refresh();
+            }}
+          >
+            Check again
+          </Pill>
           <a
             href={`mailto:${LEGAL_CONTACT}`}
             className="text-[13.5px] text-body underline-offset-4 hover:text-ink hover:underline"

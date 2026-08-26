@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     // flattening that to "active" would lose the end date the UI needs.
     if (status === "active" && membership.cancel_at_period_end) status = "canceling";
 
-    await writeSubscription({
+    const wrote = await writeSubscription({
       userId,
       status,
       membershipId: membership.id ?? null,
@@ -93,6 +93,15 @@ export async function POST(request: Request) {
       currentPeriodEnd: membership.current_period_end ?? null,
     });
 
+    if (!wrote) {
+      // 500 so Whop retries. Answering 2xx here was how a missing table or an
+      // unset SUPABASE_SERVICE_ROLE_KEY turned into a paid customer with no
+      // access and nothing in the logs.
+      console.error("[whop] could not write subscription", userId, type, status);
+      return new Response("Could not record subscription", { status: 500 });
+    }
+
+    console.info("[whop] applied", type, userId, status);
     return Response.json({ ok: true, applied: type, status });
   }
 
