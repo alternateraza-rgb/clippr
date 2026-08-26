@@ -1,5 +1,5 @@
 import { getSessionUser } from "@/lib/auth/session";
-import { hasWhop, whopCompanyId, whopPlanId } from "@/lib/config";
+import { hasWhop, whopCompanyId, whopPlanId, whopProductId } from "@/lib/config";
 import { siteOrigin } from "@/lib/supabase/origin";
 import {
   PLAN_BILLING_PERIOD_DAYS,
@@ -40,6 +40,14 @@ export async function POST() {
 
   const origin = await siteOrigin();
   const planId = whopPlanId();
+  const productId = whopProductId();
+
+  if (!planId && !productId) {
+    return Response.json(
+      { message: "No plan configured. Set WHOP_PLAN_ID." },
+      { status: 503 },
+    );
+  }
 
   try {
     const checkout = await client.checkoutConfigurations.create({
@@ -47,12 +55,13 @@ export async function POST() {
       mode: "payment",
       metadata: { user_id: user.id },
       redirect_url: `${origin}/activating`,
-      // A plan configured in the Whop dashboard wins; the inline plan exists so
-      // this works before anyone has set one up.
+      // A plan from the dashboard wins. The inline path needs a product to
+      // hang the plan on — Whop rejects a dynamic renewal plan without one.
       ...(planId
         ? { plan_id: planId }
         : {
             plan: {
+              product_id: productId,
               currency: "usd",
               plan_type: "renewal",
               initial_price: PLAN_PRICE_USD,

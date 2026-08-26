@@ -11,13 +11,20 @@ async function main() {
   const token = process.env.WHOP_API_KEY;
   const accountId = process.env.WHOP_COMPANY_ID;
   const planId = process.env.WHOP_PLAN_ID;
+  const productId = process.env.WHOP_PRODUCT_ID;
 
   if (!token) {
     console.error("[whop] WHOP_API_KEY missing — add it to .env.local");
     process.exit(1);
   }
   console.log("[whop] account:", accountId || "(none set)");
-  console.log("[whop] plan:", planId || "(none — using an inline plan)");
+  console.log("[whop] plan:", planId || "(none)");
+  console.log("[whop] product:", productId || "(none)");
+
+  if (!planId && !productId) {
+    console.error("[whop] Set WHOP_PLAN_ID (or WHOP_PRODUCT_ID). Whop rejects an inline renewal plan with no product.");
+    process.exit(1);
+  }
 
   const client = new WhopClient({ token });
 
@@ -31,6 +38,7 @@ async function main() {
         ? { plan_id: planId }
         : {
             plan: {
+              product_id: productId,
               currency: "usd",
               plan_type: "renewal",
               initial_price: 150,

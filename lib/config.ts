@@ -39,13 +39,24 @@ export function whopWebhookSecret() {
   return env("WHOP_WEBHOOK_SECRET");
 }
 
-/** Set this to sell an existing Whop plan instead of creating one per checkout. */
+/** The plan being sold. Whop rejects an inline renewal plan with no product. */
 export function whopPlanId() {
   return env("WHOP_PLAN_ID");
 }
 
+/** Alternative to WHOP_PLAN_ID: build the plan per checkout under this product. */
+export function whopProductId() {
+  return env("WHOP_PRODUCT_ID");
+}
+
+/**
+ * Billing needs something to sell. Without a plan or a product the checkout
+ * call fails at Whop, so this returns false and the gate stays open — an app
+ * that is free by accident beats one where nobody can pay and everybody is
+ * locked out.
+ */
 export function hasWhop() {
-  return Boolean(whopApiKey() && whopCompanyId());
+  return Boolean(whopApiKey() && whopCompanyId() && (whopPlanId() || whopProductId()));
 }
 
 /** Gate the app on payment. Off by default so nothing locks out by accident. */
