@@ -94,6 +94,7 @@ export function RenderStage({
   progress,
   note,
   videoId,
+  eyebrow = "Making your clip",
   className,
 }: {
   stage: StageId;
@@ -101,6 +102,8 @@ export function RenderStage({
   progress: number;
   note?: string;
   videoId?: string;
+  /** The panel fronts both the search for a cut and the render of one. */
+  eyebrow?: string;
   className?: string;
 }) {
   const reduced = usePrefersReducedMotion();
@@ -122,7 +125,7 @@ export function RenderStage({
       )}
     >
       <div className="flex items-center justify-between gap-4 px-6 pt-6">
-        <p className="eyebrow text-brand">Making your clip</p>
+        <p className="eyebrow text-brand">{eyebrow}</p>
         <p className="tnum text-[12.5px] text-white/45">
           {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}
         </p>

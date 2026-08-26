@@ -1,5 +1,5 @@
 import { captionLinesForRange } from "@/lib/agent/compose";
-import { scoreTranscript } from "@/lib/agent/score";
+import { scoreTranscript, type AvoidedClip } from "@/lib/agent/score";
 import { CaptionsDisabledError, fetchTranscript } from "@/lib/agent/transcript";
 import type { AgentEvent, AgentStage, AnalysisResult, Niche } from "@/lib/agent/types";
 import { hasLlm, isDemoMode, workerUrl, hasSupadata } from "@/lib/config";
@@ -39,7 +39,7 @@ async function waitForTranscript(videoId: string, tries = 4) {
 export async function* runAnalysis(
   videoId: string,
   niche: Niche = "finance",
-  opts?: { bypassCache?: boolean },
+  opts?: { bypassCache?: boolean; avoid?: AvoidedClip[] },
 ): AsyncGenerator<StreamPacket> {
   const t0 = Date.now();
   const events: AgentEvent[] = [];
@@ -144,7 +144,9 @@ export async function* runAnalysis(
     );
 
     yield emit("score", "Scoring windows against the retention rubric");
-    const { candidates, meta } = await scoreTranscript(transcript, niche);
+    const { candidates, meta } = await scoreTranscript(transcript, niche, {
+      avoid: opts?.avoid,
+    });
     if (hasLlm() && meta.source !== "llm") {
       yield {
         type: "error",
@@ -182,12 +184,17 @@ export async function* runAnalysis(
       events: [...events],
       scoreSource: meta.source,
     };
-    await writeAnalysisCache(videoId, analysis, {
-      niche,
-      model: meta.model,
-      source: meta.source,
-      tokens: meta.tokens,
-    });
+    // A rescan is one user rejecting one idea, not a better answer for the
+    // video. Caching it would hand the runner-up to the next person who pastes
+    // the same link.
+    if (!opts?.avoid?.length) {
+      await writeAnalysisCache(videoId, analysis, {
+        niche,
+        model: meta.model,
+        source: meta.source,
+        tokens: meta.tokens,
+      });
+    }
     yield { type: "result", analysis };
   } catch (error) {
     yield {

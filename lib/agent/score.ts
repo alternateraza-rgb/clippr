@@ -8,6 +8,32 @@ import { completeJson } from "@/lib/llm/complete";
 import { weightedScore } from "@/lib/format";
 import type { ClipCandidate, Niche, ScoreBreakdown, WordTiming } from "@/lib/agent/types";
 
+/** What the user has already turned down, so the model stops offering it. */
+export type AvoidedClip = { start: number; end: number; topic?: string; hook?: string };
+
+function fmtClock(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+/**
+ * Left to itself the model returns the same story every time — it is scoring
+ * the same transcript against the same rubric. Naming the rejected spans is
+ * what makes a rescan produce a genuinely different clip rather than the last
+ * one with the wording changed.
+ */
+function avoidNote(avoid: AvoidedClip[]) {
+  if (!avoid.length) return undefined;
+  const lines = avoid
+    .map((clip) => {
+      const label = clip.topic || clip.hook || "an earlier pick";
+      return `- "${label}" (${fmtClock(clip.start)}–${fmtClock(clip.end)})`;
+    })
+    .join("\n");
+  return `You already proposed ${avoid.length === 1 ? "this clip" : "these clips"} from this transcript and the user turned ${avoid.length === 1 ? "it" : "them"} down:\n${lines}\n\nPick a genuinely different moment: a different topic, from a different stretch of the tape. Do not return segments that overlap the time ranges above, and do not re-tell the same point in new words. If the strongest remaining option is weaker than what you already offered, return it anyway and score it honestly.`;
+}
+
 export type ScoreMeta = {
   model: string;
   tokens: number;
@@ -126,6 +152,7 @@ function blameKey(message: string) {
 export async function scoreTranscript(
   transcript: TranscriptResult,
   niche: Niche,
+  opts?: { avoid?: AvoidedClip[] },
 ): Promise<{ candidates: ClipCandidate[]; meta: ScoreMeta }> {
   if (!transcript.words.length) {
     throw new Error("No transcript words to score.");
@@ -140,13 +167,17 @@ export async function scoreTranscript(
   }
 
   const started = Date.now();
+  const avoid = avoidNote(opts?.avoid ?? []);
   let last: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const extra =
+      const correction =
         attempt === 0
           ? undefined
           : `Your previous answer was rejected: ${last instanceof Error ? last.message : "bad shape"}.\n\nThe span kept is from startQuote to endQuote — the numbers are only hints, so quoting a later endQuote is what makes a segment longer and quoting an earlier one is what makes it shorter. Keep every segment ending on a finished thought. Return the same JSON shape, with 3-6 chronological segments of 8-20 seconds each.`;
+      // A shape correction and a "not that one again" both belong in the same
+      // turn; dropping either loses the constraint it was carrying.
+      const extra = [avoid, correction].filter(Boolean).join("\n\n") || undefined;
       const { candidates, model, tokens } = await scoreWithLlm(transcript, niche, extra);
       return {
         candidates,

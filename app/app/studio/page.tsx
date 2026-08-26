@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Download } from "lucide-react";
+import { ClipProposal } from "@/components/clip/ClipProposal";
 import { RenderStage, progressFor, type StageId } from "@/components/clip/RenderStage";
 import { BeforeYouPost } from "@/components/app/BeforeYouPost";
 import { PageHeader } from "@/components/app/PageHeader";
@@ -13,9 +14,10 @@ import { Pill } from "@/components/ui/Pill";
 import { parseYouTubeId } from "@/lib/youtube";
 import { clipFilename, downloadBlobUrl } from "@/lib/download";
 import { useProfile } from "@/lib/store/profile";
+import type { AvoidedClip } from "@/lib/agent/score";
 import type { AnalysisResult, ClipCandidate } from "@/lib/agent/types";
 
-type Phase = "idle" | "working" | "done";
+type Phase = "idle" | "analyzing" | "proposal" | "working" | "done";
 
 function StudioInner() {
   const params = useSearchParams();
@@ -51,6 +53,14 @@ function StudioInner() {
   const videoId = parseYouTubeId(raw);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [candidate, setCandidate] = useState<ClipCandidate | null>(null);
+  const [rescanning, setRescanning] = useState(false);
+  /**
+   * Every cut the user has turned down, so the model stops offering them. Held
+   * as state because the count is on screen, and threaded through the calls
+   * explicitly so a rescan can never send the list it had one render ago.
+   */
+  const [rejected, setRejected] = useState<AvoidedClip[]>([]);
 
   /** Downloads are explicit now — nothing lands on disk unless it is asked for. */
   async function saveClip() {
@@ -71,11 +81,19 @@ function StudioInner() {
    * Reads the analysis stream and returns the one clip the model picked, or
    * null when the transcript is still being made on the worker.
    */
-  async function consumeAnalyze(id: string, controller: AbortController) {
+  async function consumeAnalyze(
+    id: string,
+    controller: AbortController,
+    avoid: AvoidedClip[],
+  ) {
     const res = await fetch("/api/studio/analyze", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ videoId: id, niche: profile.niche }),
+      body: JSON.stringify({
+        videoId: id,
+        niche: profile.niche,
+        avoid,
+      }),
       signal: controller.signal,
     });
     if (!res.ok || !res.body) {
@@ -233,7 +251,11 @@ function StudioInner() {
     throw new Error("This is taking unusually long. Check Library in a few minutes.");
   }
 
-  async function start(id: string) {
+  /**
+   * Finds a cut and stops. Rendering is minutes of work, so it waits for a
+   * decision rather than assuming the first idea is the wanted one.
+   */
+  async function findIdea(id: string, avoid: AvoidedClip[]) {
     abort.current?.abort();
     const controller = new AbortController();
     abort.current = controller;
@@ -242,21 +264,63 @@ function StudioInner() {
     setNote("");
     setStage("read");
     setProgress(0);
-    setPhase("working");
+    setPhase("analyzing");
 
     try {
-      let winner = await consumeAnalyze(id, controller);
+      let winner = await consumeAnalyze(id, controller, avoid);
       if (!winner) {
         await waitForWorkerTranscript(id, controller);
-        winner = await consumeAnalyze(id, controller);
+        winner = await consumeAnalyze(id, controller, avoid);
       }
       if (!winner) throw new Error("No clip could be cut from this video.");
-      await renderClip(id, winner, controller);
+      setCandidate(winner);
+      setPhase("proposal");
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       setPhase("idle");
       setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setRescanning(false);
     }
+  }
+
+  /** The user said yes. Only now does anything expensive happen. */
+  async function approve() {
+    if (!candidate || !videoId) return;
+    abort.current?.abort();
+    const controller = new AbortController();
+    abort.current = controller;
+    setError("");
+    setNote("");
+    setPhase("working");
+
+    try {
+      await renderClip(videoId, candidate, controller);
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      // Back to the proposal, not to an empty box: the cut is still good and
+      // re-deciding it would be busywork.
+      setPhase("proposal");
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    }
+  }
+
+  /** Send the model back for a different moment on the same tape. */
+  function reject() {
+    if (!candidate || !videoId) return;
+    const next = [
+      ...rejected,
+      {
+        start: candidate.start,
+        end: candidate.end,
+        topic: candidate.topic,
+        hook: candidate.hook,
+      },
+    ].slice(-6);
+    setRejected(next);
+    setRescanning(true);
+    setCandidate(null);
+    void findIdea(videoId, next);
   }
 
   function submit() {
@@ -264,12 +328,14 @@ function StudioInner() {
       setError("That doesn’t look like a YouTube link.");
       return;
     }
-    void start(videoId);
+    // A fresh link starts a fresh argument about what to cut.
+    setRejected([]);
+    void findIdea(videoId, []);
   }
 
   useEffect(() => {
     if (!initialId) return;
-    queueMicrotask(() => void start(initialId));
+    queueMicrotask(() => void findIdea(initialId, []));
     return () => abort.current?.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialId]);
@@ -349,6 +415,56 @@ function StudioInner() {
           </motion.div>
         ) : null}
 
+        {phase === "analyzing" ? (
+          <motion.div
+            key="analyzing"
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.985 }}
+            transition={base}
+          >
+            <RenderStage
+              eyebrow={rescanning ? "Finding another idea" : "Reading the video"}
+              stage={stage}
+              progress={progress}
+              note={note}
+              videoId={videoId ?? undefined}
+            />
+            <p className="mt-5 text-center text-[13px] text-muted">
+              {rescanning
+                ? "Looking somewhere else on the tape."
+                : "Nothing renders until you have seen the cut and said yes."}
+            </p>
+          </motion.div>
+        ) : null}
+
+        {phase === "proposal" && candidate ? (
+          <motion.div
+            key="proposal"
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.985 }}
+            transition={base}
+          >
+            <PageHeader
+              eyebrow="The cut"
+              title="Here's what we'd make"
+              lede="Read it over. Making the clip takes a couple of minutes, so it only starts when you say so."
+            />
+            <div className="mt-7">
+              <ClipProposal
+                candidate={candidate}
+                videoId={videoId ?? ""}
+                attempt={rejected.length + 1}
+                onApprove={approve}
+                onReject={reject}
+                rescanning={rescanning}
+              />
+            </div>
+            {error ? <p className="mt-4 text-[13.5px] text-brand">{error}</p> : null}
+          </motion.div>
+        ) : null}
+
         {phase === "working" ? (
           <motion.div
             key="working"
@@ -364,7 +480,7 @@ function StudioInner() {
               videoId={videoId ?? undefined}
             />
             <p className="mt-5 text-center text-[13px] text-muted">
-              You can leave this page — the clip downloads on its own when it is done.
+              You can leave this page — the clip lands in your Library when it is done.
             </p>
           </motion.div>
         ) : null}
