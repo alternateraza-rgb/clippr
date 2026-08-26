@@ -1,12 +1,7 @@
 import { getSessionUser } from "@/lib/auth/session";
 import { hasWhop, whopCompanyId, whopPlanId, whopProductId } from "@/lib/config";
 import { siteOrigin } from "@/lib/supabase/origin";
-import {
-  PLAN_BILLING_PERIOD_DAYS,
-  PLAN_PRICE_USD,
-  PLAN_TITLE,
-  whopClient,
-} from "@/lib/billing/whop";
+import { inlinePlan, whopClient } from "@/lib/billing/whop";
 import { hasAccess, readSubscription } from "@/lib/billing/subscription";
 import { describeWhopError } from "@/lib/billing/error";
 
@@ -59,18 +54,7 @@ export async function POST() {
       // hang the plan on — Whop rejects a dynamic renewal plan without one.
       ...(planId
         ? { plan_id: planId }
-        : {
-            plan: {
-              product_id: productId,
-              currency: "usd",
-              plan_type: "renewal",
-              initial_price: PLAN_PRICE_USD,
-              renewal_price: PLAN_PRICE_USD,
-              billing_period: PLAN_BILLING_PERIOD_DAYS,
-              title: PLAN_TITLE,
-              visibility: "hidden",
-            },
-          }),
+        : { plan: inlinePlan(productId!) }),
     });
 
     if (!checkout.purchase_url) {

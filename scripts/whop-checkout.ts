@@ -1,6 +1,7 @@
 import "../lib/load-env";
 import { WhopClient } from "@whop/sdk";
 import { describeWhopError } from "../lib/billing/error";
+import { inlinePlan } from "../lib/billing/whop";
 
 /**
  * Creates a throwaway checkout with the same arguments the app uses, and
@@ -34,20 +35,7 @@ async function main() {
       mode: "payment",
       metadata: { user_id: "diagnostic" },
       redirect_url: "https://clipmuse.online/activating",
-      ...(planId
-        ? { plan_id: planId }
-        : {
-            plan: {
-              product_id: productId,
-              currency: "usd",
-              plan_type: "renewal",
-              initial_price: 150,
-              renewal_price: 150,
-              billing_period: 30,
-              title: "Clipmuse — Unlimited",
-              visibility: "hidden",
-            },
-          }),
+      ...(planId ? { plan_id: planId } : { plan: inlinePlan(productId!) }),
     });
     console.log("[whop] OK");
     console.log("       id:", checkout.id);
