@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_HINT_COOKIE } from "@/lib/supabase/session-hint";
+import { billingEnforced } from "@/lib/config";
+import { hasAccess, readSubscription } from "@/lib/billing/subscription";
 
 function copyCookies(from: NextResponse, to: NextResponse) {
   from.cookies.getAll().forEach((cookie) => to.cookies.set(cookie));
@@ -81,6 +83,13 @@ export async function updateSession(request: NextRequest) {
       .maybeSingle();
     if (!profile || profile.onboarding_complete === false) {
       return bounce("/onboarding");
+    }
+
+    // Onboarding first, then payment. Someone who has not finished telling us
+    // their niche should not be looking at a card form.
+    if (billingEnforced()) {
+      const subscription = await readSubscription(user.id);
+      if (!hasAccess(subscription)) return bounce("/checkout");
     }
   }
 

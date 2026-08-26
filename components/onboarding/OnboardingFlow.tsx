@@ -64,7 +64,10 @@ export function OnboardingFlow() {
         platforms: next.platforms,
       }),
     }).catch(() => null);
-    router.push("/app");
+    // The proxy decides where they actually land: /checkout while billing is
+    // enforced and unpaid, /app once it is not. Sending them to /app and
+    // letting it bounce would flash the studio at someone who cannot use it.
+    router.push("/checkout");
     router.refresh();
   }
 
@@ -214,7 +217,7 @@ export function OnboardingFlow() {
             <Pill onClick={() => setStep((s) => s + 1)}>Continue</Pill>
           ) : (
             <Pill onClick={finish} disabled={finishing}>
-              {finishing ? "Stocking your desk…" : "Open the studio"}
+              {finishing ? "Stocking your desk…" : "Finish setup"}
             </Pill>
           )}
         </div>

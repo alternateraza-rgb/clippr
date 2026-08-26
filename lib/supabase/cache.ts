@@ -433,12 +433,16 @@ export async function deleteClipRender(userId: string, id: string): Promise<bool
     }
   }
 
-  const { error } = await supabase
+  // .select() so the count is the answer. A delete filtered out by RLS returns
+  // no error and zero rows, so trusting `!error` reported success while nothing
+  // was removed — the card animated away and came back on the next poll.
+  const { data: removed, error } = await supabase
     .from("clip_renders")
     .delete()
     .eq("user_id", userId)
-    .eq("id", id);
-  return !error;
+    .eq("id", id)
+    .select("id");
+  return !error && (removed?.length ?? 0) > 0;
 }
 
 export async function signedClipUrl(path: string): Promise<string | null> {

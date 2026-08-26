@@ -47,7 +47,7 @@ export function Hero() {
         </div>
 
         <p className="mt-5 text-center text-[13px] text-muted">
-          Start free · No card required to look around
+          $150 a month · Unlimited clips · Cancel any time
         </p>
 
         <dl className="mx-auto mt-16 grid max-w-[760px] grid-cols-1 gap-px overflow-hidden rounded-[var(--radius-panel)] bg-hairline sm:grid-cols-3">

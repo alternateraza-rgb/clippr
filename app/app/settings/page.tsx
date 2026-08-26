@@ -5,7 +5,7 @@ import { PasswordCard } from "@/components/app/PasswordCard";
 import { PageHeader } from "@/components/app/PageHeader";
 import { SettingsRow, SettingsSection } from "@/components/app/SettingsSection";
 import { StatTile } from "@/components/app/StatTile";
-import { Chip } from "@/components/ui/Chip";
+import { Chip, Tag } from "@/components/ui/Chip";
 import { Pill } from "@/components/ui/Pill";
 import { signOut } from "@/app/auth/actions";
 import { LEGAL_CONTACT } from "@/lib/legal";
@@ -22,12 +22,29 @@ const PLATFORMS: { id: Platform; label: string }[] = [
 ];
 
 type Account = { email: string; createdAt: string; hasPassword: boolean };
+type Billing = {
+  enforced: boolean;
+  access: boolean;
+  status: string;
+  currentPeriodEnd?: string | null;
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  active: "Active",
+  trialing: "Trial",
+  canceling: "Cancels at period end",
+  past_due: "Payment failed",
+  canceled: "Cancelled",
+  expired: "Expired",
+  none: "No plan",
+};
 
 export default function SettingsPage() {
   const { profile, setProfile } = useProfile();
   const { renders } = useRenders();
   const [account, setAccount] = useState<Account | null>(null);
   const [authEnabled, setAuthEnabled] = useState(false);
+  const [billing, setBilling] = useState<Billing | null>(null);
 
   useEffect(() => {
     fetch("/api/account")
@@ -36,6 +53,11 @@ export default function SettingsPage() {
         setAccount(d.account ?? null);
         setAuthEnabled(Boolean(d.authEnabled));
       })
+      .catch(() => null);
+
+    fetch("/api/billing/status")
+      .then((r) => r.json())
+      .then(setBilling)
       .catch(() => null);
   }, []);
 
@@ -128,13 +150,30 @@ export default function SettingsPage() {
           <div className="rounded-[var(--radius-card)] bg-surface p-5 shadow-hairline">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                {/* No status badge: nothing in this app tracks subscription
-                    state, so claiming "Active" would be asserting something we
-                    do not know. Describe the plan, not a billing status. */}
-                <p className="text-[16px] font-semibold text-ink">Unlimited</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-[16px] font-semibold text-ink">Unlimited</p>
+                  {/* Only claimed once billing is wired and the webhook has
+                      actually told us. Off, this stays silent rather than
+                      asserting a state nothing tracks. */}
+                  {billing?.enforced ? (
+                    <Tag tone={billing.access ? "success" : "warn"}>
+                      {STATUS_LABEL[billing.status] ?? billing.status}
+                    </Tag>
+                  ) : null}
+                </div>
                 <p className="mt-1.5 text-[14px] text-body">
                   Unlimited generations, the full edit, and your library kept.
                 </p>
+                {billing?.currentPeriodEnd ? (
+                  <p className="mt-1.5 text-[13px] text-muted">
+                    {billing.status === "canceling" ? "Access until " : "Renews "}
+                    {new Date(billing.currentPeriodEnd).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </p>
+                ) : null}
               </div>
               <p className="display shrink-0 text-[26px] text-ink">
                 $150

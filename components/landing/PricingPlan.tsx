@@ -62,7 +62,7 @@ export function PricingPlan() {
               </StartCta>
 
               <p className="mt-4 text-center text-[12.5px] text-white/45">
-                Takes a minute to set up. No card required to look around.
+                Takes a minute to set up. Cancel any time.
               </p>
             </div>
           </Reveal>

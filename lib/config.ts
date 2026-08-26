@@ -22,6 +22,37 @@ export function hasSupabase() {
   return Boolean(env("NEXT_PUBLIC_SUPABASE_URL") && env("NEXT_PUBLIC_SUPABASE_ANON_KEY"));
 }
 
+/**
+ * Whop is the merchant of record for the $150/month plan. Everything billing
+ * is optional: with no keys the app runs exactly as it did before, which is
+ * what keeps local development and preview deploys usable.
+ */
+export function whopApiKey() {
+  return env("WHOP_API_KEY");
+}
+
+export function whopCompanyId() {
+  return env("WHOP_COMPANY_ID");
+}
+
+export function whopWebhookSecret() {
+  return env("WHOP_WEBHOOK_SECRET");
+}
+
+/** Set this to sell an existing Whop plan instead of creating one per checkout. */
+export function whopPlanId() {
+  return env("WHOP_PLAN_ID");
+}
+
+export function hasWhop() {
+  return Boolean(whopApiKey() && whopCompanyId());
+}
+
+/** Gate the app on payment. Off by default so nothing locks out by accident. */
+export function billingEnforced() {
+  return hasWhop() && env("BILLING_ENFORCED").toLowerCase() !== "false";
+}
+
 export function llmKey() {
   return env("LLM_API_KEY") || env("OPENAI_API_KEY");
 }

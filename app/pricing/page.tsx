@@ -17,7 +17,7 @@ const FAQS = [
   },
   {
     q: "Is there a free trial?",
-    a: "You can create an account and look around without a card. Making clips needs the plan.",
+    a: "Not right now. The plan starts when you finish signing up — $150 a month, unlimited clips, and you can cancel any time and keep access to the end of the month you paid for.",
   },
   {
     q: "Can I cancel?",
