@@ -54,10 +54,18 @@ export function OnboardingFlow() {
       nicheSource: source,
       onboardingComplete: true,
     };
+    // Awaited: the proxy reads onboarding_complete on the very next request,
+    // and navigating before this lands bounces them back to onboarding.
     await setProfile(next);
-    await fetch("/api/discovery/bootstrap", {
+
+    // Not awaited. Stocking the feed is a YouTube search and a model pass —
+    // tens of seconds — and nothing on the next screen needs it. keepalive so
+    // the request survives the navigation that happens immediately after, and
+    // it finishes while they are reading the checkout page.
+    void fetch("/api/discovery/bootstrap", {
       method: "POST",
       headers: { "content-type": "application/json" },
+      keepalive: true,
       body: JSON.stringify({
         niche: next.niche,
         interests: next.interests,
@@ -217,7 +225,7 @@ export function OnboardingFlow() {
             <Pill onClick={() => setStep((s) => s + 1)}>Continue</Pill>
           ) : (
             <Pill onClick={finish} disabled={finishing}>
-              {finishing ? "Stocking your desk…" : "Finish setup"}
+              {finishing ? "Saving…" : "Finish setup"}
             </Pill>
           )}
         </div>
