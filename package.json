@@ -13,7 +13,8 @@
     "service:install": "./scripts/install-mac-service.sh",
     "service:uninstall": "./scripts/install-mac-service.sh uninstall",
     "service:logs": "tail -f ~/Library/Logs/clipmuse/com.clipmuse.*.log",
-    "whop:plans": "tsx scripts/whop-plans.ts"
+    "whop:plans": "tsx scripts/whop-plans.ts",
+    "whop:checkout": "tsx scripts/whop-checkout.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

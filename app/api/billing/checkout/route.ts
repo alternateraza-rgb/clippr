@@ -8,6 +8,7 @@ import {
   whopClient,
 } from "@/lib/billing/whop";
 import { hasAccess, readSubscription } from "@/lib/billing/subscription";
+import { describeWhopError } from "@/lib/billing/error";
 
 export const runtime = "nodejs";
 
@@ -74,7 +75,13 @@ export async function POST() {
 
     return Response.json({ url, checkoutId: checkout.id });
   } catch (error) {
-    console.error("[billing] checkout failed", error);
-    return Response.json({ message: "Could not start checkout." }, { status: 502 });
+    // Whop's own message, not a generic one: "Could not start checkout" is
+    // untraceable, and the API says exactly which field it objected to.
+    const described = describeWhopError(error);
+    console.error("[billing] checkout failed", described.statusCode, described.message, described.detail);
+    return Response.json(
+      { message: `Checkout failed: ${described.message}`, statusCode: described.statusCode },
+      { status: 502 },
+    );
   }
 }
