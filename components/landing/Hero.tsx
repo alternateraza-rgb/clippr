@@ -4,6 +4,12 @@ import { StartCta } from "@/components/landing/StartCta";
 import { Pill } from "@/components/ui/Pill";
 import { SHOWCASE } from "@/lib/fixtures/showcase";
 
+const PROOF = [
+  { value: "$10,400", label: "avg. member payout / mo" },
+  { value: "2.3M+", label: "views generated" },
+  { value: "1,200+", label: "people earning" },
+];
+
 export function Hero() {
   return (
     <section className="relative overflow-hidden px-6 pb-20 pt-16 md:pb-28 md:pt-24">
@@ -43,6 +49,15 @@ export function Hero() {
         <p className="mt-5 text-center text-[13px] text-muted">
           $150 a month · Unlimited clips · Cancel any time
         </p>
+
+        <dl className="mx-auto mt-16 grid max-w-[760px] grid-cols-1 gap-px overflow-hidden rounded-[var(--radius-panel)] bg-hairline sm:grid-cols-3">
+          {PROOF.map((stat) => (
+            <div key={stat.label} className="bg-canvas px-6 py-7 text-center">
+              <dt className="display text-[30px] text-ink">{stat.value}</dt>
+              <dd className="mt-1.5 text-[13px] text-muted">{stat.label}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
     </section>
   );
