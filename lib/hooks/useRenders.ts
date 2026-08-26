@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ClipRender } from "@/lib/agent/types";
 
 export function useRenders() {
   const [renders, setRenders] = useState<ClipRender[]>([]);
   const [loading, setLoading] = useState(true);
+  /**
+   * Ids the server has already confirmed deleted. The poll below can still be
+   * holding a response from before the delete landed, so without this the card
+   * pops back into the grid for one four-second beat.
+   */
+  const dropped = useRef(new Set<string>());
 
   useEffect(() => {
     let cancelled = false;
@@ -13,7 +19,8 @@ export function useRenders() {
       fetch("/api/studio/renders")
         .then((r) => r.json())
         .then((data: { renders?: ClipRender[] }) => {
-          if (!cancelled) setRenders(data.renders ?? []);
+          if (cancelled) return;
+          setRenders((data.renders ?? []).filter((r) => !dropped.current.has(r.id)));
         })
         .catch(() => null)
         .finally(() => {
@@ -28,5 +35,10 @@ export function useRenders() {
     };
   }, []);
 
-  return { renders, loading, reload: () => undefined };
+  const remove = useCallback((id: string) => {
+    dropped.current.add(id);
+    setRenders((current) => current.filter((r) => r.id !== id));
+  }, []);
+
+  return { renders, loading, remove };
 }

@@ -402,6 +402,45 @@ export async function getClipRender(userId: string, id: string): Promise<ClipRen
   return asRender(data as Parameters<typeof asRender>[0]);
 }
 
+/**
+ * Removes a clip and the files behind it.
+ *
+ * The `user_id` filter is the authorisation, not a convenience: this runs
+ * through the admin client, which is outside RLS, so dropping that predicate
+ * would let anyone delete anyone's clip by guessing an id.
+ */
+export async function deleteClipRender(userId: string, id: string): Promise<boolean> {
+  const supabase = createAdminClient() ?? (await createClient());
+  if (!supabase) return false;
+
+  const { data } = await supabase
+    .from("clip_renders")
+    .select("output_path")
+    .eq("user_id", userId)
+    .eq("id", id)
+    .maybeSingle();
+  if (!data) return false;
+
+  const path = (data as { output_path?: string | null }).output_path;
+  if (path) {
+    try {
+      // The poster is written beside the mp4 under the same key. Storage
+      // failures must not block the row delete, or a clip whose file already
+      // went missing could never be cleared from the library.
+      await supabase.storage.from("clips").remove([path, path.replace(/\.mp4$/, ".jpg")]);
+    } catch {
+      // Falls through to the row delete.
+    }
+  }
+
+  const { error } = await supabase
+    .from("clip_renders")
+    .delete()
+    .eq("user_id", userId)
+    .eq("id", id);
+  return !error;
+}
+
 export async function signedClipUrl(path: string): Promise<string | null> {
   const supabase = createAdminClient() ?? (await createClient());
   if (!supabase) return null;

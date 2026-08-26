@@ -101,6 +101,13 @@ body {
   border-radius: 4px;
 }
 
+/* Dialogs and sheets take focus programmatically so the screen reader lands
+   inside them. Tab can never reach these, so the ring is noise around a whole
+   panel rather than an affordance. */
+[tabindex="-1"]:focus-visible {
+  outline: none;
+}
+
 @layer components {
   /* The house voice. Tight, mid-weight, optically flush — the tracking has to
      come off as the size goes up or it reads as a default h1. */

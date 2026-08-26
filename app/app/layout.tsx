@@ -1,5 +1,4 @@
 import { AppShell } from "@/components/app/AppShell";
-import { ClipAutoDownload } from "@/components/app/ClipAutoDownload";
 
 export default function AppLayout({
   children,
@@ -8,8 +7,6 @@ export default function AppLayout({
 }) {
   return (
     <AppShell>
-      {/* Renders finish long after you leave Studio; this catches them anywhere. */}
-      <ClipAutoDownload />
       {children}
     </AppShell>
   );

@@ -3,13 +3,15 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
+import { Download } from "lucide-react";
 import { RenderStage, progressFor, type StageId } from "@/components/clip/RenderStage";
+import { BeforeYouPost } from "@/components/app/BeforeYouPost";
 import { PageHeader } from "@/components/app/PageHeader";
 import { usePrefersReducedMotion } from "@/components/motion/usePrefersReducedMotion";
 import { base } from "@/components/motion/presets";
 import { Pill } from "@/components/ui/Pill";
 import { parseYouTubeId } from "@/lib/youtube";
-import { clipFilename, downloadBlobUrl, markDownloaded } from "@/lib/download";
+import { clipFilename, downloadBlobUrl } from "@/lib/download";
 import { useProfile } from "@/lib/store/profile";
 import type { AnalysisResult, ClipCandidate } from "@/lib/agent/types";
 
@@ -36,6 +38,8 @@ function StudioInner() {
     advance(progressFor(next));
   };
   const [clip, setClip] = useState<{
+    id: string;
+    videoId: string;
     url: string;
     poster: string | null;
     hook: string;
@@ -45,6 +49,23 @@ function StudioInner() {
   } | null>(null);
 
   const videoId = parseYouTubeId(raw);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  /** Downloads are explicit now — nothing lands on disk unless it is asked for. */
+  async function saveClip() {
+    if (!clip) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      await downloadBlobUrl(clip.url, clipFilename(clip.videoId, clip.id));
+    } catch {
+      setSaveError("That download didn't start. Try it again from your Library.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
 
   /**
    * Reads the analysis stream and returns the one clip the model picked, or
@@ -166,9 +187,10 @@ function StudioInner() {
       };
       const render = data.render;
       if (render?.status === "ready" && render.downloadUrl) {
-        markDownloaded(payload.renderId);
         advance(100);
         setClip({
+          id: payload.renderId,
+          videoId: id,
           url: render.downloadUrl,
           poster: render.posterUrl ?? null,
           hook: candidate.hook,
@@ -178,9 +200,6 @@ function StudioInner() {
         });
         setStage("done");
         setPhase("done");
-        // The shell downloads finished clips too, but only on its own poll —
-        // firing here means the file lands the moment the page knows.
-        await downloadBlobUrl(render.downloadUrl, clipFilename(id, payload.renderId)).catch(() => null);
         return;
       }
       if (render?.status === "failed") throw new Error(render.error || "Render failed.");
@@ -405,12 +424,20 @@ function StudioInner() {
             </motion.div>
 
             <motion.div
-              className="mt-7 flex items-center gap-3"
+              className="mt-7 flex flex-wrap items-center justify-center gap-3"
               initial={reduced ? false : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ ...base, delay: 0.32 }}
             >
               <Pill
+                onClick={saveClip}
+                loading={saving}
+                icon={<Download className="h-4 w-4" strokeWidth={2} />}
+              >
+                Download
+              </Pill>
+              <Pill
+                variant="ghost"
                 onClick={() => {
                   setPhase("idle");
                   setRaw("");
@@ -425,9 +452,22 @@ function StudioInner() {
               </Pill>
             </motion.div>
 
-            <p className="mt-4 text-[12.5px] text-muted">
-              Saved to your device and your Library.
-            </p>
+            {saveError ? (
+              <p className="mt-3 text-[13px] text-brand">{saveError}</p>
+            ) : (
+              <p className="mt-4 text-[12.5px] text-muted">
+                Kept in your Library — download it now or any time later.
+              </p>
+            )}
+
+            <motion.div
+              className="mt-12 w-full"
+              initial={reduced ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...base, delay: 0.44 }}
+            >
+              <BeforeYouPost />
+            </motion.div>
           </motion.div>
         ) : null}
       </AnimatePresence>

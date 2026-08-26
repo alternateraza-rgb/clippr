@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Film, RotateCw, X } from "lucide-react";
 import { ClipCard } from "@/components/app/ClipCard";
+import { BeforeYouPost } from "@/components/app/BeforeYouPost";
 import { ClipLightbox } from "@/components/app/ClipLightbox";
 import { PageHeader } from "@/components/app/PageHeader";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Pill } from "@/components/ui/Pill";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { stagger } from "@/components/motion/presets";
@@ -15,9 +17,29 @@ import type { ClipRender } from "@/lib/agent/types";
 type Clip = ClipRender & { posterUrl?: string | null };
 
 export default function LibraryPage() {
-  const { renders, loading } = useRenders();
+  const { renders, loading, remove } = useRenders();
   const [open, setOpen] = useState<Clip | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Clip | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const res = await fetch(`/api/studio/renders/${pendingDelete.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(String(res.status));
+      // Only now: the card animating out is a promise that the file is gone.
+      remove(pendingDelete.id);
+      setPendingDelete(null);
+    } catch {
+      setDeleteError("That clip could not be deleted. Try again in a moment.");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   const { clips, working, failed } = useMemo(() => {
     const list = renders as Clip[];
@@ -70,9 +92,22 @@ export default function LibraryPage() {
           animate="show"
           className="mt-10 grid grid-cols-2 gap-5 md:grid-cols-3 xl:grid-cols-4"
         >
-          {clips.map((render, i) => (
-            <ClipCard key={render.id} render={render} index={i} onOpen={() => setOpen(render)} />
-          ))}
+          {/* popLayout so the surviving cards slide into the gap instead of
+              snapping once the deleted one has finished leaving. */}
+          <AnimatePresence mode="popLayout">
+            {clips.map((render, i) => (
+              <ClipCard
+                key={render.id}
+                render={render}
+                index={i}
+                onOpen={() => setOpen(render)}
+                onDelete={() => {
+                  setDeleteError("");
+                  setPendingDelete(render);
+                }}
+              />
+            ))}
+          </AnimatePresence>
         </motion.div>
       ) : !loading ? (
         <EmptyState />
@@ -100,7 +135,34 @@ export default function LibraryPage() {
         </div>
       ) : null}
 
+      {/* Only once you have something to post — posting advice above an empty
+          library is just noise. */}
+      {clips.length ? <BeforeYouPost className="mt-14 max-w-[640px]" /> : null}
+
       <ClipLightbox render={open} onClose={() => setOpen(null)} />
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Delete this clip?"
+        body={
+          <>
+            This removes{" "}
+            <span className="text-ink">
+              {pendingDelete?.topic || pendingDelete?.hook || "this clip"}
+            </span>{" "}
+            and the video file behind it. If you haven&apos;t downloaded it, it&apos;s
+            gone for good.
+          </>
+        }
+        confirmLabel="Delete clip"
+        working={deleting}
+        error={deleteError}
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setPendingDelete(null);
+          setDeleteError("");
+        }}
+      />
     </div>
   );
 }

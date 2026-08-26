@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Download, Play } from "lucide-react";
+import { Download, Play, Trash2 } from "lucide-react";
 import { usePrefersReducedMotion } from "@/components/motion/usePrefersReducedMotion";
 import { base, riseIn, riseInStill } from "@/components/motion/presets";
 import { clipFilename, downloadBlobUrl } from "@/lib/download";
@@ -20,10 +20,12 @@ function seconds(value?: number | null) {
 export function ClipCard({
   render,
   onOpen,
+  onDelete,
   index = 0,
 }: {
   render: ClipRender & { posterUrl?: string | null };
   onOpen: () => void;
+  onDelete?: () => void;
   index?: number;
 }) {
   const reduced = usePrefersReducedMotion();
@@ -59,8 +61,14 @@ export function ClipCard({
 
   return (
     <motion.article
+      layout
       variants={reduced ? riseInStill : riseIn}
       custom={index}
+      exit={
+        reduced
+          ? { opacity: 0 }
+          : { opacity: 0, scale: 0.9, filter: "blur(4px)", transition: { duration: 0.24 } }
+      }
       onMouseEnter={() => preview(true)}
       onMouseLeave={() => preview(false)}
       onClick={onOpen}
@@ -108,19 +116,37 @@ export function ClipCard({
           </span>
         ) : null}
 
-        <button
-          type="button"
-          onClick={save}
-          aria-label="Download clip"
+        <div
           className={cn(
-            "absolute left-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-full",
-            "bg-canvas/85 text-ink shadow-hairline backdrop-blur-sm",
-            "opacity-0 transition-all duration-[var(--dur-base)] group-hover:opacity-100 hover:scale-105",
+            "absolute left-2.5 top-2.5 flex items-center gap-1.5",
+            "opacity-0 transition-opacity duration-[var(--dur-base)] group-hover:opacity-100",
+            "focus-within:opacity-100",
             saving && "opacity-100",
           )}
         >
-          <Download className={cn("h-4 w-4", saving && "animate-pulse")} strokeWidth={1.9} />
-        </button>
+          <button
+            type="button"
+            onClick={save}
+            aria-label="Download clip"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-canvas/85 text-ink shadow-hairline backdrop-blur-sm transition-transform hover:scale-105"
+          >
+            <Download className={cn("h-4 w-4", saving && "animate-pulse")} strokeWidth={1.9} />
+          </button>
+
+          {onDelete ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDelete();
+              }}
+              aria-label="Delete clip"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-canvas/85 text-ink shadow-hairline backdrop-blur-sm transition-[transform,background-color,color] hover:scale-105 hover:bg-brand hover:text-on-brand"
+            >
+              <Trash2 className="h-4 w-4" strokeWidth={1.9} />
+            </button>
+          ) : null}
+        </div>
 
         <div className="absolute inset-x-0 bottom-0 p-3.5">
           <p className="line-clamp-2 text-[13.5px] font-medium leading-snug text-on-brand">
