@@ -74,9 +74,11 @@ async function downloadViaYtdlp(
     }
     args.push(...(await cookieArgs(dir)));
     args.push("-o", `${dir}/src.%(ext)s`, youtubeUrl(videoId));
-    // A stalled peer must fail fast so the retry can pick a live one. Audio
-    // gets longer because whisperWindow pulls ten minutes of it.
-    await run("yt-dlp", args, { timeoutMs: kind === "audio" ? 240_000 : 150_000 });
+    // A stalled peer must fail fast so the retry can pick a live one — but not
+    // so fast that a healthy slow download is killed. Video windows carry
+    // padding for sentence-boundary detection, so they are longer than the
+    // clip; audio is longer still when whisperWindow pulls ten minutes.
+    await run("yt-dlp", args, { timeoutMs: kind === "audio" ? 300_000 : 240_000 });
     const file = await pickOutput(dir);
     if (!file) throw new Error("yt-dlp finished but wrote no file");
     await rename(`${dir}/${file}`, dest);

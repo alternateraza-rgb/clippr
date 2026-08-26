@@ -6,8 +6,11 @@ function openaiKey() {
   return env("OPENAI_API_KEY") || env("LLM_API_KEY");
 }
 
+export type Sentence = { start: number; end: number; text: string };
+
 export async function transcribeFile(path: string): Promise<{
   words: WordTiming[];
+  sentences: Sentence[];
   language: string;
   text: string;
 }> {
@@ -20,6 +23,11 @@ export async function transcribeFile(path: string): Promise<{
   form.append("model", "whisper-1");
   form.append("response_format", "verbose_json");
   form.append("timestamp_granularities[]", "word");
+  // Segments are the reason this call exists twice over: Whisper's words carry
+  // no punctuation at all, but its segments are complete, punctuated sentences
+  // with real timings. That is the only trustworthy signal for where a thought
+  // actually ends — auto-captions have neither punctuation nor pauses.
+  form.append("timestamp_granularities[]", "segment");
 
   const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
     method: "POST",
@@ -34,6 +42,7 @@ export async function transcribeFile(path: string): Promise<{
     text?: string;
     language?: string;
     words?: Array<{ word?: string; start?: number; end?: number }>;
+    segments?: Array<{ text?: string; start?: number; end?: number }>;
   };
   const words: WordTiming[] = (data.words ?? [])
     .map((w) => ({
@@ -42,8 +51,17 @@ export async function transcribeFile(path: string): Promise<{
       end: Number(w.end) || 0,
     }))
     .filter((w) => w.text);
+  const sentences: Sentence[] = (data.segments ?? [])
+    .map((s) => ({
+      start: Number(s.start) || 0,
+      end: Number(s.end) || 0,
+      text: (s.text ?? "").trim(),
+    }))
+    .filter((s) => s.text && s.end > s.start);
+
   return {
     words,
+    sentences,
     language: data.language || "en",
     text: data.text || "",
   };

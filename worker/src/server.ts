@@ -47,8 +47,13 @@ async function pumpTranscribe() {
   transcribing = false;
 }
 
-/** Longer than any healthy render, shorter than a working day. */
-const RENDER_LIMIT_MS = 15 * 60 * 1000;
+/**
+ * Longer than any healthy render, shorter than a working day. Four padded
+ * downloads plus a transcription probe each is several minutes before the edit
+ * even starts, and YouTube's throughput varies by an order of magnitude — 15
+ * minutes killed renders that were making normal progress.
+ */
+const RENDER_LIMIT_MS = 25 * 60 * 1000;
 
 function enqueue(id: string) {
   if (!id) return;

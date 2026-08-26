@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { createAdminClient } from "../../lib/supabase/admin";
 import { captionLinesForRange } from "../../lib/agent/compose";
 import { jumpCutDuration, planJumpCuts, remapCaptionLines, type Interval } from "../../lib/agent/jumpcuts";
+import { snapToSentences } from "../../lib/agent/boundaries";
 import type {
   CaptionLine,
   CaptionPreset,
@@ -66,6 +67,11 @@ async function fetchGameplayLoop(
   return dest;
 }
 
+/** Downloaded either side of a chosen span, purely so the cut can be moved onto
+ *  a real sentence boundary. None of it necessarily reaches the output. */
+const HEAD_PAD_S = 2;
+const TAIL_PAD_S = 12;
+
 type SourceInfo = { width: number; height: number };
 
 /**
@@ -111,9 +117,12 @@ async function encoderArgs(): Promise<string[]> {
       .then(({ stdout }) => stdout.includes("h264_videotoolbox"))
       .catch(() => false);
   }
+  // 3.5M is ample for 720x1280 talking-head footage and keeps a 60s clip near
+  // 26MB. At 6M a slightly long clip crossed the storage object limit and the
+  // whole render failed at the last step, after all the work was done.
   return videotoolbox
-    ? ["-c:v", "h264_videotoolbox", "-b:v", "6M", "-profile:v", "high"]
-    : ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"];
+    ? ["-c:v", "h264_videotoolbox", "-b:v", "3.5M", "-maxrate", "4.5M", "-profile:v", "high"]
+    : ["-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-maxrate", "4.5M", "-bufsize", "9M"];
 }
 
 export async function processRender(renderId: string) {
@@ -128,7 +137,11 @@ export async function processRender(renderId: string) {
   let end = Math.max(start + 8, Number(row.end_s) || start + 20);
   if (end - start > 75) end = start + 75;
 
-  const dir = join(tmpdir(), "clipmuse-worker", renderId);
+  // Per attempt, not per render. The render ceiling in the worker abandons a
+  // slow job without stopping it, so a retry of the same id can be running
+  // while the first attempt is still alive — and a shared directory means one
+  // run's cleanup deletes the other's half-downloaded files.
+  const dir = join(tmpdir(), "clipmuse-worker", `${renderId}-${Date.now().toString(36)}`);
   await mkdir(dir, { recursive: true });
 
   try {
@@ -143,25 +156,67 @@ export async function processRender(renderId: string) {
 
     const raw = join(dir, "raw.mp4");
     const pieces: string[] = [];
-    /** Seam positions on the assembled timeline, for forcing shot changes. */
-    const seams: number[] = [];
     let assembled = 0;
 
     for (const [index, segment] of segments.entries()) {
-      const from = Math.max(0, segment.start);
-      const span = Math.max(1, segment.end - from);
+      // Padding either side is downloaded so the cut can be moved onto a real
+      // sentence boundary. Most of it is thrown away again.
+      const from = Math.max(0, segment.start - HEAD_PAD_S);
+      const to = segment.end + TAIL_PAD_S;
       const sourceFile = join(dir, `src-${index}.mp4`);
       const piece = join(dir, `piece-${index}.mp4`);
       // Ask for just this window. A provider that can only return the whole
       // video reports offset 0, and the cut below stays correct either way.
       const source = await downloadSource(row.video_id, sourceFile, "video", {
         start: from,
-        end: segment.end,
+        end: to,
       });
-      await cutReencode(sourceFile, piece, from - source.offset, span, "video");
+
+      // Where the chosen span sits inside the downloaded file.
+      let cutFrom = segment.start - source.offset;
+      let cutTo = segment.end - source.offset;
+
+      // Decide the boundary here, on this piece alone, while the audio is still
+      // continuous. Doing it after assembly does not work: Whisper is then
+      // listening across hard joins, and it segments the seam itself rather
+      // than the sentences either side of it.
+      try {
+        const probeAudio = join(dir, `probe-${index}.mp3`);
+        await run(
+          "ffmpeg",
+          ["-y", "-i", sourceFile, "-vn", "-ac", "1", "-ar", "16000", "-b:a", "64k", probeAudio],
+          { timeoutMs: 120_000 },
+        );
+        const probe = await transcribeFile(probeAudio);
+        const [snappedFrom, snappedTo] = snapToSentences(
+          probe.sentences,
+          [cutFrom, cutTo],
+          probe.words,
+        );
+        if (snappedTo - snappedFrom > 3) {
+          if (Math.abs(snappedTo - cutTo) > 0.2 || Math.abs(snappedFrom - cutFrom) > 0.2) {
+            console.info(
+              `[render] segment ${index + 1} snapped to sentence bounds: ` +
+                `${cutFrom.toFixed(1)}-${cutTo.toFixed(1)} → ${snappedFrom.toFixed(1)}-${snappedTo.toFixed(1)}`,
+            );
+          }
+          cutFrom = snappedFrom;
+          cutTo = snappedTo;
+        }
+        await rm(probeAudio, { force: true }).catch(() => null);
+      } catch (probeErr) {
+        // A failed probe means the model's own boundary stands. Worse cut,
+        // still a clip.
+        console.warn(
+          `[render] boundary probe failed on segment ${index + 1}`,
+          probeErr instanceof Error ? probeErr.message.slice(0, 120) : probeErr,
+        );
+      }
+
+      const span = Math.max(1, cutTo - cutFrom);
+      await cutReencode(sourceFile, piece, cutFrom, span, "video");
       await rm(sourceFile, { force: true }).catch(() => null);
       pieces.push(piece);
-      if (index > 0) seams.push(assembled);
       assembled += span;
       // Downloads dominate the early wait, so spread the checkpoints over them.
       await setStatus(renderId, {
@@ -211,12 +266,12 @@ export async function processRender(renderId: string) {
       }
     }
 
-    // Only jump-cut dead air when we trust the word timing it's based on —
-    // cutting video on fabricated/approximate timestamps would slice into
-    // real speech.
+    // Boundaries were already decided per segment, before assembly. All that is
+    // left here is dead air, and only when the word timing can be trusted.
     const plan = whisperOk
       ? planJumpCuts(words, duration)
       : ({ keep: [[0, duration] as Interval], removed: [] } as { keep: Interval[]; removed: Interval[] });
+
     const editedLines = plan.removed.length ? remapCaptionLines(lines, plan.removed) : lines;
     const outDuration = plan.removed.length ? jumpCutDuration(duration, plan.removed) : duration;
 
@@ -235,7 +290,7 @@ export async function processRender(renderId: string) {
     // Framing follows the speaker where we can see them; where we cannot, the
     // shots still cut, just centred.
     const track = await trackSpeaker(raw);
-    const shots = planShots(plan.keep, words, track.centerAt, seams);
+    const shots = planShots(plan.keep, words, track.centerAt);
     await setStatus(renderId, { status: "rendering", progress: 58 });
     console.info(
       `[render] ${shots.length} shots · ${track.samples} face samples · ${outDuration.toFixed(1)}s`,
