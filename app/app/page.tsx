@@ -182,8 +182,8 @@ function EmptyFeed({
       </span>
       <p className="mx-auto mt-4 max-w-[42ch] text-[15px] leading-relaxed text-body">
         {live
-          ? "Nothing in the feed yet for this niche. Send the agent out to research it."
-          : "Add YOUTUBE_API_KEY to research real longform, or paste a link above."}
+          ? "Nothing in the feed for this niche yet. Send Clipmuse out to find some."
+          : "No ideas queued up right now. Paste a link above to cut one yourself."}
       </p>
       <div className="mt-5">
         <Pill

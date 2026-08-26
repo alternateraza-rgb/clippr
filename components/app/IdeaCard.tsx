@@ -72,7 +72,7 @@ export function IdeaCard({
 
         <p className="mt-4 flex items-center gap-1.5 border-t border-hairline pt-3.5 text-[12px] text-muted">
           <Clapperboard className="h-3.5 w-3.5" strokeWidth={2} />
-          {item.estimatedClipCount} cuts in this one
+          {item.estimatedClipCount} cut{item.estimatedClipCount === 1 ? "" : "s"} in this one
         </p>
       </div>
     </button>

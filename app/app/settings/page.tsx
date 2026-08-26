@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { PasswordCard } from "@/components/app/PasswordCard";
 import { PageHeader } from "@/components/app/PageHeader";
+import { SettingsRow, SettingsSection } from "@/components/app/SettingsSection";
+import { StatTile } from "@/components/app/StatTile";
 import { Chip } from "@/components/ui/Chip";
 import { Pill } from "@/components/ui/Pill";
 import { signOut } from "@/app/auth/actions";
+import { LEGAL_CONTACT } from "@/lib/legal";
 import { FORMATS, NICHES } from "@/lib/fixtures/niches";
+import { CAPTION_PRESETS, GAMEPLAY_TRACKS } from "@/lib/fixtures/presets";
+import { useRenders } from "@/lib/hooks/useRenders";
 import { useProfile } from "@/lib/store/profile";
 import type { CaptionPreset, GameplayTrack, Niche, Platform } from "@/lib/agent/types";
 
@@ -15,30 +21,45 @@ const PLATFORMS: { id: Platform; label: string }[] = [
   { id: "instagram", label: "Reels" },
 ];
 
+type Account = { email: string; createdAt: string; hasPassword: boolean };
+
 export default function SettingsPage() {
-  const { profile, setProfile, reset } = useProfile();
-  const [connections, setConnections] = useState<{
-    llm?: boolean;
-    youtube?: boolean;
-    worker?: boolean;
-    liveFeed?: boolean;
-    authEnabled?: boolean;
-    ingest?: boolean;
-    download?: boolean;
-    workerApify?: boolean;
-    workerApifyKnown?: boolean;
-    workerReachable?: boolean;
-    workerFfmpeg?: boolean;
-    workerProxy?: boolean;
-    workerYtdlp?: string;
-  } | null>(null);
+  const { profile, setProfile } = useProfile();
+  const { renders } = useRenders();
+  const [account, setAccount] = useState<Account | null>(null);
+  const [authEnabled, setAuthEnabled] = useState(false);
 
   useEffect(() => {
-    fetch("/api/config")
+    fetch("/api/account")
       .then((r) => r.json())
-      .then(setConnections)
+      .then((d: { account?: Account | null; authEnabled?: boolean }) => {
+        setAccount(d.account ?? null);
+        setAuthEnabled(Boolean(d.authEnabled));
+      })
       .catch(() => null);
   }, []);
+
+  const stats = useMemo(() => {
+    const ready = renders.filter((r) => r.status === "ready");
+    const now = new Date();
+    const thisMonth = ready.filter((r) => {
+      const at = new Date(r.createdAt);
+      return at.getMonth() === now.getMonth() && at.getFullYear() === now.getFullYear();
+    });
+    const seconds = ready.reduce((total, r) => total + (r.durationS ?? 0), 0);
+    return {
+      total: ready.length,
+      thisMonth: thisMonth.length,
+      minutes: Math.round(seconds / 60),
+    };
+  }, [renders]);
+
+  const joined = account?.createdAt
+    ? new Date(account.createdAt).toLocaleDateString("en-GB", {
+        month: "short",
+        year: "numeric",
+      })
+    : "—";
 
   function togglePlatform(id: Platform) {
     const next = profile.platforms.includes(id)
@@ -47,170 +68,239 @@ export default function SettingsPage() {
     setProfile({ ...profile, platforms: next.length ? next : [id] });
   }
 
+  function toggleFormat(id: string) {
+    const interests = profile.interests.includes(id)
+      ? profile.interests.filter((i) => i !== id)
+      : [...profile.interests, id];
+    setProfile({ ...profile, interests });
+  }
+
   return (
-    <div className="max-w-[640px]">
+    <div className="max-w-[820px] pb-4">
       <PageHeader
         eyebrow="Settings"
-        title="The desk"
-        lede="These preferences steer Home, Ideas, and the default Studio setup."
+        title="Your account"
+        lede="Your details, your plan, and the defaults every new clip starts from."
       />
 
-      {connections ? (
-        <section className="mt-10 rounded-[12px] bg-surface p-5 shadow-hairline">
-          <p className="eyebrow text-muted">Connections</p>
-          <ul className="mt-3 space-y-2 text-[14px] text-body">
-            <li>{connections.authEnabled ? "Supabase auth is on." : "Supabase keys missing."}</li>
-            <li>
-              {connections.llm
-                ? "OpenAI brain is on (LLM_API_KEY or OPENAI_API_KEY)."
-                : "Set LLM_API_KEY or OPENAI_API_KEY."}
-            </li>
-            <li>
-              {connections.youtube
-                ? "YouTube Data API is on."
-                : "Set YOUTUBE_API_KEY for a live Ideas feed."}
-            </li>
-            <li>
-              {connections.ingest
-                ? "Supadata is on (cloud transcripts)."
-                : "Set SUPADATA_API_KEY for cloud transcripts (no home PC)."}
-            </li>
-            <li>
-              {connections.download
-                ? "Apify token is set on Vercel."
-                : "Set APIFY_TOKEN on Vercel (and Render) so export does not hit YouTube."}
-            </li>
-            <li>
-              {connections.workerApify
-                ? "Render worker has Apify (cloud download)."
-                : connections.workerApifyKnown
-                  ? "Render worker is up, but APIFY_TOKEN is missing on that service."
-                  : connections.workerReachable
-                    ? "Render worker is up. Redeploy the worker image so it can report APIFY_TOKEN."
-                    : connections.worker
-                      ? "Worker URL is set, but health timed out (Render may be waking)."
-                      : "Set CLIP_WORKER_URL + CLIP_WORKER_SECRET for ffmpeg export."}
-            </li>
-            <li>
-              {connections.worker
-                ? connections.workerFfmpeg
-                  ? "ffmpeg is present on the worker."
-                  : "Render worker URL is set."
-                : "Set CLIP_WORKER_URL + CLIP_WORKER_SECRET for ffmpeg export."}
-            </li>
-            <li>
-              {connections.workerProxy
-                ? `Downloads go through a residential proxy (yt-dlp ${connections.workerYtdlp || "?"}).`
-                : connections.workerReachable
-                  ? "No YTDLP_PROXY on the worker — YouTube will 403 its datacenter IP."
-                  : "Worker unreachable, so proxy status is unknown."}
-            </li>
-            <li>
-              {connections.liveFeed
-                ? "Home can stock a live niche feed."
-                : "Live feed needs YouTube + service role."}
-            </li>
-          </ul>
-        </section>
-      ) : null}
-
-      <section className="mt-10">
-        <p className="eyebrow text-muted">Name</p>
-        <input
-          value={profile.displayName}
-          onChange={(e) => setProfile({ ...profile, displayName: e.target.value })}
-          className="mt-3 w-full rounded-[10px] bg-surface px-4 py-2.5 text-[15px] shadow-hairline outline-none"
+      <div className="mt-9 grid gap-px overflow-hidden rounded-[var(--radius-card)] bg-hairline sm:grid-cols-3">
+        <StatTile value={stats.total} label="Clips created" hint="Finished and downloadable" />
+        <StatTile value={stats.thisMonth} label="This month" hint="Since the 1st" />
+        <StatTile
+          value={stats.minutes}
+          label="Minutes cut"
+          hint="Total length of your clips"
         />
-      </section>
+      </div>
 
-      <section className="mt-8">
-        <p className="eyebrow text-muted">Niche</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {NICHES.map((n) => (
-            <Chip
-              key={n.id}
-              selected={profile.niche === n.id}
-              onClick={() => setProfile({ ...profile, niche: n.id as Niche })}
-            >
-              {n.label}
-            </Chip>
-          ))}
-        </div>
-      </section>
+      <div className="mt-10">
+        <SettingsSection
+          title="Account"
+          description="How you sign in. Changing your password signs out your other devices."
+        >
+          <div className="divide-y divide-hairline">
+            <SettingsRow
+              label="Email"
+              value={account?.email || (authEnabled ? "Loading…" : "Not signed in")}
+            />
+            <SettingsRow label="Member since" value={joined} />
+            <div className="py-3 last:pb-0">
+              {authEnabled && account?.hasPassword ? (
+                <PasswordCard email={account.email} />
+              ) : (
+                <div>
+                  <p className="text-[12.5px] text-muted">Password</p>
+                  <p className="mt-0.5 text-[14px] text-body">
+                    {authEnabled
+                      ? "You signed in without a password, so there's nothing to change here."
+                      : "Sign in to manage your password."}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </SettingsSection>
 
-      <section className="mt-8">
-        <p className="eyebrow text-muted">Platforms</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {PLATFORMS.map((p) => (
-            <Chip
-              key={p.id}
-              selected={profile.platforms.includes(p.id)}
-              onClick={() => togglePlatform(p.id)}
-            >
-              {p.label}
-            </Chip>
-          ))}
-        </div>
-      </section>
+        <SettingsSection
+          title="Plan"
+          description="Unlimited clips, billed monthly."
+        >
+          <div className="rounded-[var(--radius-card)] bg-surface p-5 shadow-hairline">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                {/* No status badge: nothing in this app tracks subscription
+                    state, so claiming "Active" would be asserting something we
+                    do not know. Describe the plan, not a billing status. */}
+                <p className="text-[16px] font-semibold text-ink">Unlimited</p>
+                <p className="mt-1.5 text-[14px] text-body">
+                  Unlimited generations, the full edit, and your library kept.
+                </p>
+              </div>
+              <p className="display shrink-0 text-[26px] text-ink">
+                $150
+                <span className="text-[14px] font-normal text-muted"> / mo</span>
+              </p>
+            </div>
+            <p className="mt-5 border-t border-hairline pt-4 text-[13.5px] leading-relaxed text-muted">
+              To change or cancel your plan, email{" "}
+              <a
+                href={`mailto:${LEGAL_CONTACT}`}
+                className="text-brand underline-offset-4 hover:underline"
+              >
+                {LEGAL_CONTACT}
+              </a>
+              . Cancelling stops the next charge and you keep access to the end of
+              the month you already paid for.
+            </p>
+          </div>
+        </SettingsSection>
 
-      <section className="mt-8">
-        <p className="eyebrow text-muted">Formats</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {FORMATS.map((f) => (
-            <Chip
-              key={f.id}
-              selected={profile.interests.includes(f.id)}
-              onClick={() => {
-                const interests = profile.interests.includes(f.id)
-                  ? profile.interests.filter((i) => i !== f.id)
-                  : [...profile.interests, f.id];
-                setProfile({ ...profile, interests });
-              }}
-            >
-              {f.label}
-            </Chip>
-          ))}
-        </div>
-      </section>
+        <SettingsSection
+          title="Profile"
+          description="The name we greet you with."
+        >
+          <input
+            value={profile.displayName}
+            onChange={(e) => setProfile({ ...profile, displayName: e.target.value })}
+            placeholder="Your name"
+            aria-label="Display name"
+            className="w-full max-w-[340px] rounded-[var(--radius-control)] bg-surface px-4 py-3 text-[15px] text-ink outline-none shadow-[inset_0_0_0_1px_var(--color-hairline)] transition-shadow placeholder:text-muted focus:shadow-[inset_0_0_0_1.5px_var(--color-ink)]"
+          />
+        </SettingsSection>
 
-      <section className="mt-8">
-        <p className="eyebrow text-muted">Default captions</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {(["hormozi", "clean", "karaoke"] as CaptionPreset[]).map((p) => (
-            <Chip
-              key={p}
-              selected={profile.captionPreset === p}
-              onClick={() => setProfile({ ...profile, captionPreset: p })}
-            >
-              {p}
-            </Chip>
-          ))}
-        </div>
-      </section>
+        <SettingsSection
+          title="Your niche"
+          description="What Ideas goes looking for each morning."
+        >
+          <div className="flex flex-wrap gap-2">
+            {NICHES.map((n) => (
+              <Chip
+                key={n.id}
+                selected={profile.niche === n.id}
+                onClick={() => setProfile({ ...profile, niche: n.id as Niche })}
+              >
+                {n.label}
+              </Chip>
+            ))}
+          </div>
+        </SettingsSection>
 
-      <section className="mt-8">
-        <p className="eyebrow text-muted">Default gameplay</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {(["minecraft", "gta", "subway", "none"] as GameplayTrack[]).map((g) => (
-            <Chip
-              key={g}
-              selected={profile.defaultGameplay === g}
-              onClick={() => setProfile({ ...profile, defaultGameplay: g })}
-            >
-              {g}
-            </Chip>
-          ))}
-        </div>
-      </section>
+        <SettingsSection
+          title="Where you post"
+          description="Used to pick aspect ratio and length defaults."
+        >
+          <div className="flex flex-wrap gap-2">
+            {PLATFORMS.map((p) => (
+              <Chip
+                key={p.id}
+                selected={profile.platforms.includes(p.id)}
+                onClick={() => togglePlatform(p.id)}
+              >
+                {p.label}
+              </Chip>
+            ))}
+          </div>
+        </SettingsSection>
 
-      <div className="mt-14 flex flex-wrap gap-3">
-        <Pill variant="ghost" onClick={reset}>
-          Reset to demo profile
-        </Pill>
-        <Pill variant="outline" onClick={() => void signOut()}>
-          Sign out
-        </Pill>
+        <SettingsSection
+          title="Formats you like"
+          description="Nudges which moments get picked out of a video."
+        >
+          <div className="flex flex-wrap gap-2">
+            {FORMATS.map((f) => (
+              <Chip
+                key={f.id}
+                selected={profile.interests.includes(f.id)}
+                onClick={() => toggleFormat(f.id)}
+              >
+                {f.label}
+              </Chip>
+            ))}
+          </div>
+        </SettingsSection>
+
+        <SettingsSection
+          title="Caption style"
+          description="Burned into every clip you make."
+        >
+          <div className="grid gap-2.5">
+            {CAPTION_PRESETS.map((preset) => (
+              <ChoiceRow
+                key={preset.id}
+                label={preset.label}
+                detail={preset.detail}
+                selected={profile.captionPreset === preset.id}
+                onSelect={() =>
+                  setProfile({ ...profile, captionPreset: preset.id as CaptionPreset })
+                }
+              />
+            ))}
+          </div>
+        </SettingsSection>
+
+        <SettingsSection
+          title="Background footage"
+          description="Optional filler under the speaker, to hold attention."
+        >
+          <div className="grid gap-2.5">
+            {GAMEPLAY_TRACKS.map((track) => (
+              <ChoiceRow
+                key={track.id}
+                label={track.label}
+                detail={track.detail}
+                selected={profile.defaultGameplay === track.id}
+                onSelect={() =>
+                  setProfile({ ...profile, defaultGameplay: track.id as GameplayTrack })
+                }
+              />
+            ))}
+          </div>
+        </SettingsSection>
+
+        <SettingsSection title="Session" description="Sign out on this device.">
+          <Pill variant="outline" onClick={() => void signOut()}>
+            Sign out
+          </Pill>
+        </SettingsSection>
       </div>
     </div>
+  );
+}
+
+/** A radio in everything but markup — label, one line of why, a selected state. */
+function ChoiceRow({
+  label,
+  detail,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  detail: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`flex w-full items-start gap-3 rounded-[var(--radius-control)] px-4 py-3 text-left transition-colors duration-[var(--dur-fast)] ${
+        selected
+          ? "bg-surface shadow-[inset_0_0_0_1.5px_var(--color-ink)]"
+          : "bg-surface shadow-[inset_0_0_0_1px_var(--color-hairline)] hover:bg-surface-warm"
+      }`}
+    >
+      <span
+        className={`mt-[3px] flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full transition-colors ${
+          selected ? "bg-ink" : "shadow-[inset_0_0_0_1.5px_var(--color-hairline-strong)]"
+        }`}
+      >
+        {selected ? <span className="h-[5px] w-[5px] rounded-full bg-canvas" /> : null}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[14.5px] font-medium text-ink">{label}</span>
+        <span className="mt-0.5 block text-[13px] leading-relaxed text-muted">{detail}</span>
+      </span>
+    </button>
   );
 }

@@ -14,14 +14,12 @@ export function AuthCard({
   title,
   subtitle,
   action,
-  href,
   showName,
   footer,
 }: {
   title: string;
   subtitle: string;
   action: string;
-  href: string;
   showName?: boolean;
   footer: React.ReactNode;
 }) {
@@ -89,18 +87,10 @@ export function AuthCard({
             <CallbackError />
           </Suspense>
         )}
-        {!authEnabled ? (
-          <input type="hidden" name="demo" value="1" />
-        ) : null}
         <Pill type="submit" size="lg" className="mt-5 w-full" loading={pending}>
           {action}
         </Pill>
       </form>
-      {!authEnabled ? (
-        <p className="mt-4 text-[13px] text-muted">
-          Auth is off in this environment — continue goes straight to {href}.
-        </p>
-      ) : null}
       <p className="mt-8 text-[14px] text-muted">{footer}</p>
     </AuthShell>
   );

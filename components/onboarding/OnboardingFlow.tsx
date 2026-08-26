@@ -114,7 +114,7 @@ export function OnboardingFlow() {
             {step === 1 ? (
               <Step key="n" title="What is the channel about?">
                 <p className="mt-4 max-w-[40ch] text-body">
-                  One niche. The feed, the ideas, and the agent all tune to it.
+                  Pick one. Your daily ideas and every clip we cut tune to it.
                 </p>
                 <div className="mt-10 flex flex-wrap gap-2">
                   {NICHES.map((n) => (
@@ -158,7 +158,7 @@ export function OnboardingFlow() {
             {step === 2 ? (
               <Step key="f" title="How do you like to cut?">
                 <p className="mt-4 max-w-[38ch] text-body">
-                  Formats help the agent prefer story beats, arguments, or highlights.
+                  This nudges which moments get pulled out — story beats, arguments, or highlights.
                 </p>
                 <div className="mt-10 flex flex-wrap gap-2">
                   {FORMATS.map((f) => (

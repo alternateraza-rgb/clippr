@@ -7,7 +7,6 @@ export default function SignupPage() {
       title="Start clipping."
       subtitle="Create an account. We’ll ask about niche next."
       action="Continue"
-      href="/onboarding"
       showName
       footer={
         <>

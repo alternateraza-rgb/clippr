@@ -122,7 +122,8 @@ function SheetBody({
                 {item.video.channel}
               </p>
               <p className="tnum mt-1 text-[12px] text-white/55">
-                {formatDuration(item.video.durationS)} · {item.estimatedClipCount} cuts
+                {formatDuration(item.video.durationS)} · {item.estimatedClipCount} cut
+                {item.estimatedClipCount === 1 ? "" : "s"}
               </p>
             </div>
             <ScoreRing score={item.score} size={52} onDark className="shrink-0" />
@@ -151,7 +152,7 @@ function SheetBody({
               badge={
                 <Tag tone={preview.source === "llm" ? "brand" : "neutral"}>
                   <Sparkles className="h-3 w-3" strokeWidth={2.2} />
-                  {preview.source === "llm" ? "AI read" : "From metadata"}
+                  {preview.source === "llm" ? "AI read" : "Quick read"}
                 </Tag>
               }
             >

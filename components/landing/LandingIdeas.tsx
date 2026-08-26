@@ -37,7 +37,7 @@ export function LandingIdeas() {
                 {idea.whyItClips}
               </p>
               <p className="mt-6 border-t border-hairline pt-4 text-[12.5px] text-muted">
-                {idea.estimatedClipCount} cuts in this one
+                {idea.estimatedClipCount} cut{idea.estimatedClipCount === 1 ? "" : "s"} in this one
               </p>
           </article>
         ))}

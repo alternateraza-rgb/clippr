@@ -7,7 +7,6 @@ export default function LoginPage() {
       title="Welcome back."
       subtitle="Sign in to your clipping desk."
       action="Enter the studio"
-      href="/app"
       footer={
         <>
           New here?{" "}

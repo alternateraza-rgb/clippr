@@ -99,7 +99,7 @@ export function heuristicPreview(input: PreviewInput): IdeaPreview {
     ].filter(Boolean),
     scores: spread(input.score, rand),
     watchOut:
-      "Written from the video's metadata. Run the clip to have the model read the actual transcript.",
+      "This read comes from the title and description only. Cut the clip and Clipmuse reads the whole transcript.",
   };
 }
 
