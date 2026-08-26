@@ -10,8 +10,16 @@ export type Sentence = { start: number; end: number; text: string };
  * padded window — importing speech the model never chose and pushing a 60s clip
  * to 72s.
  */
-const LOOK_FORWARD_S = 6;
-const LOOK_BACK_S = 4;
+/**
+ * Asymmetric on purpose. Pulling an end *back* onto a finished sentence removes
+ * a fragment, which is always an improvement. Pushing it *forward* adds speech
+ * the model never chose, and rides on Whisper's punctuation being right — it
+ * once extended a clean ending by four seconds onto "at the time in Russia,"
+ * because Whisper had put a full stop there. Reach forward only far enough to
+ * finish a sentence already in progress.
+ */
+const LOOK_FORWARD_S = 2.5;
+const LOOK_BACK_S = 4.5;
 /** The start may creep forward, or a hair back onto its own first word. */
 const START_FORWARD_S = 3;
 const START_BACK_S = 1;
