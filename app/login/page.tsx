@@ -1,19 +1,13 @@
 import Link from "next/link";
 import { AuthCard } from "@/components/auth/AuthCard";
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
-  const params = await searchParams;
+export default function LoginPage() {
   return (
     <AuthCard
       title="Welcome back."
       subtitle="Sign in to your clipping desk."
       action="Enter the studio"
       href="/app"
-      initialError={params.error}
       footer={
         <>
           New here?{" "}

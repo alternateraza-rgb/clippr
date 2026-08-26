@@ -1,86 +1,64 @@
-"use client";
-
-import { Orb } from "@/components/motion/Orb";
-import { WordReveal } from "@/components/motion/Reveal";
-import { ClipLoop } from "@/components/clip/ClipLoop";
-import { ClipPreview } from "@/components/clip/ClipPreview";
+import { ClipFrame } from "@/components/landing/ClipFrame";
+import { RotatingWord } from "@/components/landing/RotatingWord";
+import { StartCta } from "@/components/landing/StartCta";
 import { Pill } from "@/components/ui/Pill";
-import { ANALYSES } from "@/lib/fixtures/analyses";
-import { VIDEOS } from "@/lib/fixtures/videos";
+import { SHOWCASE } from "@/lib/fixtures/showcase";
 
-const demo = ANALYSES[VIDEOS.longTitle.videoId].candidates[0];
+const PROOF = [
+  { value: "$10,400", label: "avg. member payout / mo*" },
+  { value: "2.3M+", label: "views generated*" },
+  { value: "1,200+", label: "people earning*" },
+];
 
-type HeroProps = {
-  exampleClips?: string[];
-};
-
-export function Hero({ exampleClips = [] }: HeroProps) {
+export function Hero() {
   return (
-    <section className="relative overflow-hidden">
-      <Orb className="-left-24 top-10 h-[420px] w-[420px] md:left-[42%] md:top-0 md:h-[560px] md:w-[560px]" />
-      <div className="relative mx-auto grid max-w-[1200px] items-center gap-16 px-6 pb-24 pt-20 md:grid-cols-[1.15fr_0.85fr] md:pb-32 md:pt-28">
-        <div>
-          <p className="eyebrow text-brand">Make money online</p>
-          <h1 className="display mt-5 max-w-[18ch] text-[clamp(40px,6.4vw,68px)] text-ink">
-            <WordReveal text="Make $10,000/month using AI clipping." accentWord="$10000/month" />
-          </h1>
-          <p className="mt-6 max-w-[42ch] text-[17px] leading-relaxed text-body">
-            AI clipping means turning long videos into short, viral-ready
-            clips — automatically. No editing skills, no camera, no
-            experience needed. Just AI, clips, and a payday.
-          </p>
-          <div className="mt-9 flex flex-wrap items-center gap-3">
-            <Pill href="/signup" className="px-6 py-3">
-              Start making money
-            </Pill>
-            <Pill href="#how" variant="ghost" className="px-6 py-3">
-              See how it works
-            </Pill>
-          </div>
-          <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-muted">
-            <span>No camera needed</span>
-            <span className="h-1 w-1 rounded-full bg-hairline" />
-            <span>No editing skills</span>
-            <span className="h-1 w-1 rounded-full bg-hairline" />
-            <span>Start free</span>
-          </div>
-          <div className="mt-10 flex flex-wrap gap-x-8 gap-y-4 border-t border-hairline pt-6">
-            <div>
-              <p className="font-display text-[22px] font-light tracking-tight text-ink">
-                $10,400
-              </p>
-              <p className="text-[12px] text-muted">avg. member payout/mo*</p>
-            </div>
-            <div>
-              <p className="font-display text-[22px] font-light tracking-tight text-ink">
-                2.3M+
-              </p>
-              <p className="text-[12px] text-muted">views generated*</p>
-            </div>
-            <div>
-              <p className="font-display text-[22px] font-light tracking-tight text-ink">
-                1,200+
-              </p>
-              <p className="text-[12px] text-muted">people earning*</p>
-            </div>
-          </div>
-          <p className="mt-2 text-[11px] text-muted/70">*Illustrative figures</p>
+    <section className="relative overflow-hidden px-6 pb-20 pt-16 md:pb-28 md:pt-24">
+      <div className="mx-auto max-w-[1120px]">
+        {/* The headline brackets the product rather than sitting beside it —
+            you read the promise, see the thing, then read the payoff. */}
+        <h1 className="display-xl mx-auto max-w-[16ch] text-center text-[clamp(42px,8.2vw,86px)] text-ink">
+          <span className="block">
+            Turn one{" "}
+            <RotatingWord words={["podcast", "stream", "interview", "sermon", "VOD"]} />
+          </span>
+        </h1>
+
+        <div className="mx-auto mt-10 grid max-w-[720px] grid-cols-3 items-center gap-3 sm:gap-5 md:mt-12">
+          <ClipFrame clip={SHOWCASE[0]} className="translate-y-5 -rotate-3" />
+          <ClipFrame clip={SHOWCASE[1]} autoplay priority className="scale-[1.06] shadow-pop" />
+          <ClipFrame clip={SHOWCASE[2]} className="translate-y-5 rotate-3" />
         </div>
-        <div className="mx-auto w-full max-w-[320px]">
-          {exampleClips.length > 0 ? (
-            <ClipLoop sources={exampleClips} />
-          ) : (
-            <ClipPreview
-              videoId={VIDEOS.longTitle.videoId}
-              start={demo.start}
-              duration={demo.end - demo.start}
-              captionLines={demo.captionLines}
-              preset="hormozi"
-              gameplay="minecraft"
-              fallbackText={demo.hook}
-            />
-          )}
+
+        <h2 className="display-xl mx-auto mt-10 max-w-[18ch] text-center text-[clamp(42px,8.2vw,86px)] text-ink md:mt-12">
+          into a week of clips
+        </h2>
+
+        <p className="mx-auto mt-7 max-w-[46ch] text-center text-[17px] leading-relaxed text-body">
+          Paste a link. Clipmuse watches the whole thing, finds the moment worth
+          posting, and edits it into a vertical clip with captions already burned
+          in. No camera, no editing, no experience.
+        </p>
+
+        <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+          <StartCta size="lg" />
+          <Pill href="#how" variant="outline" size="lg">
+            See how it works
+          </Pill>
         </div>
+
+        <p className="mt-5 text-center text-[13px] text-muted">
+          Start free · No card required to look around
+        </p>
+
+        <dl className="mx-auto mt-16 grid max-w-[760px] grid-cols-1 gap-px overflow-hidden rounded-[var(--radius-panel)] bg-hairline sm:grid-cols-3">
+          {PROOF.map((stat) => (
+            <div key={stat.label} className="bg-canvas px-6 py-7 text-center">
+              <dt className="display text-[30px] text-ink">{stat.value}</dt>
+              <dd className="mt-1.5 text-[13px] text-muted">{stat.label}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-3 text-center text-[11.5px] text-muted/80">*Illustrative figures</p>
       </div>
     </section>
   );

@@ -45,7 +45,7 @@ export default function LibraryPage() {
       />
 
       {working.length ? (
-        <div className="mt-8 flex items-center gap-3 rounded-[var(--radius-card,16px)] bg-surface px-5 py-4 shadow-hairline">
+        <div className="mt-8 flex items-center gap-3 rounded-[var(--radius-card)] bg-surface px-5 py-4 shadow-hairline">
           <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-60" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-brand" />
@@ -81,7 +81,7 @@ export default function LibraryPage() {
       {/* Failures are quiet, not silent: one line, dismissible. A clip that
           died with no trace at all just looks like the app lost it. */}
       {failed.length && !dismissed ? (
-        <div className="mt-10 flex items-center gap-3 rounded-[var(--radius-control,10px)] bg-surface-warm px-4 py-3">
+        <div className="mt-10 flex items-center gap-3 rounded-[var(--radius-control)] bg-surface-warm px-4 py-3">
           <p className="flex-1 text-[13px] text-body">
             {failed.length} clip{failed.length === 1 ? "" : "s"} didn&apos;t finish.
           </p>
@@ -107,7 +107,7 @@ export default function LibraryPage() {
 
 function EmptyState() {
   return (
-    <div className="mt-12 flex flex-col items-center rounded-[var(--radius-panel,22px)] bg-surface px-6 py-16 text-center shadow-hairline">
+    <div className="mt-12 flex flex-col items-center rounded-[var(--radius-panel)] bg-surface px-6 py-16 text-center shadow-hairline">
       <span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-warm">
         <Film className="h-6 w-6 text-brand" strokeWidth={1.5} />
       </span>

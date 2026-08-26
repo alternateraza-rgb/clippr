@@ -7,7 +7,6 @@ import { RenderStage, progressFor, type StageId } from "@/components/clip/Render
 import { PageHeader } from "@/components/app/PageHeader";
 import { usePrefersReducedMotion } from "@/components/motion/usePrefersReducedMotion";
 import { base } from "@/components/motion/presets";
-import { Field } from "@/components/ui/Field";
 import { Pill } from "@/components/ui/Pill";
 import { parseYouTubeId } from "@/lib/youtube";
 import { clipFilename, downloadBlobUrl, markDownloaded } from "@/lib/download";
@@ -257,7 +256,7 @@ function StudioInner() {
   }, [initialId]);
 
   return (
-    <div className="mx-auto max-w-[600px]">
+    <div className="mx-auto max-w-[680px] pb-4">
       {/* Deliberately not mode="wait": that holds the next screen until the
           previous one finishes exiting, so anything that stalls an exit
           animation — a backgrounded tab, a throttled frame loop — leaves the
@@ -276,42 +275,78 @@ function StudioInner() {
               title="Cut the moment"
               lede="Paste a longform YouTube link. We watch the whole thing, pick the strongest minute, and edit it into a vertical clip."
             />
-            <div className="mt-8">
-              <Field
-                value={raw}
-                onChange={(v) => {
-                  setRaw(v);
-                  setError("");
-                }}
-                onSubmit={submit}
-                submitLabel="Clip it"
-                placeholder="Paste a long YouTube link (8+ min)"
-              />
+
+            <div className="mt-8 rounded-[var(--radius-panel)] bg-void p-6 text-white md:p-7">
+              <div className="flex flex-col gap-2.5 sm:flex-row">
+                <input
+                  value={raw}
+                  onChange={(e) => {
+                    setRaw(e.target.value);
+                    setError("");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") submit();
+                  }}
+                  placeholder="Paste a long YouTube link (8+ min)"
+                  aria-label="YouTube link"
+                  className="min-w-0 flex-1 rounded-[var(--radius-pill)] bg-white/10 px-5 py-3.5 text-[15px] text-white outline-none ring-1 ring-inset ring-white/15 transition-shadow placeholder:text-white/40 focus:ring-2 focus:ring-white/60"
+                />
+                <button
+                  type="button"
+                  onClick={submit}
+                  className="shrink-0 rounded-[var(--radius-pill)] bg-brand px-7 py-3.5 text-[15px] font-semibold text-on-brand shadow-[inset_0_1px_0_rgb(255_255_255/0.22)] transition-colors hover:bg-brand-hover active:scale-[0.98]"
+                >
+                  Clip it
+                </button>
+              </div>
+
+              {error ? (
+                <motion.p
+                  initial={reduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-3 text-[13.5px] text-brand-tint"
+                >
+                  {error}
+                </motion.p>
+              ) : null}
+
+              <p className="mt-4 text-[12.5px] text-white/40">
+                One clip per video — the best 50 to 60 seconds on the tape.
+              </p>
             </div>
-            {error ? (
-              <motion.p
-                initial={reduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-3 text-[13px] text-brand"
-              >
-                {error}
-              </motion.p>
-            ) : null}
-            <p className="mt-8 text-[13px] text-muted">
-              One clip per video — the best 50 to 60 seconds on the tape.
-            </p>
+
+            <ol className="mt-8 grid gap-px overflow-hidden rounded-[var(--radius-card)] bg-hairline sm:grid-cols-3">
+              {[
+                ["Listens", "Every word, timed to the audio."],
+                ["Chooses", "The topic, and the moments that tell it."],
+                ["Edits", "Framed vertical, captions burned in."],
+              ].map(([title, body]) => (
+                <li key={title} className="bg-surface p-5">
+                  <p className="text-[13.5px] font-semibold text-ink">{title}</p>
+                  <p className="mt-1.5 text-[13px] leading-relaxed text-muted">{body}</p>
+                </li>
+              ))}
+            </ol>
           </motion.div>
         ) : null}
 
         {phase === "working" ? (
           <motion.div
             key="working"
-            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.99 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
             exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.985 }}
             transition={base}
           >
-            <RenderStage stage={stage} progress={progress} note={note} />
+            <RenderStage
+              stage={stage}
+              progress={progress}
+              note={note}
+              videoId={videoId ?? undefined}
+            />
+            <p className="mt-5 text-center text-[13px] text-muted">
+              You can leave this page — the clip downloads on its own when it is done.
+            </p>
           </motion.div>
         ) : null}
 
@@ -319,7 +354,7 @@ function StudioInner() {
           <motion.div
             key="done"
             className="flex flex-col items-center"
-            initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.92, y: 20 }}
+            initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={
               reduced ? base : { type: "spring", stiffness: 260, damping: 26, mass: 0.9 }
@@ -329,52 +364,37 @@ function StudioInner() {
               className="eyebrow text-brand"
               initial={reduced ? false : { opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ ...base, delay: 0.15 }}
+              transition={{ ...base, delay: 0.12 }}
             >
               Your clip is ready
             </motion.p>
 
-            <div className="relative mt-5">
-              {/* The glow lands a beat after the video, so the reveal has a
-                  second act rather than everything arriving at once. */}
-              {!reduced ? (
-                <motion.div
-                  aria-hidden
-                  className="absolute -inset-6 rounded-[32px] blur-2xl"
-                  style={{
-                    background:
-                      "radial-gradient(circle at 50% 40%, rgba(196,90,102,0.35), rgba(253,252,252,0) 70%)",
-                  }}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.9, delay: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
-                />
-              ) : null}
-              <video
-                src={clip.url}
-                poster={clip.poster ?? undefined}
-                controls
-                autoPlay
-                loop
-                playsInline
-                className="relative max-h-[62vh] rounded-[var(--radius-panel,22px)] bg-black shadow-pop"
-              />
-            </div>
+            <video
+              src={clip.url}
+              poster={clip.poster ?? undefined}
+              controls
+              autoPlay
+              loop
+              playsInline
+              className="mt-5 max-h-[58vh] rounded-[var(--radius-panel)] bg-black shadow-pop"
+            />
 
             <motion.div
               className="mt-7 w-full max-w-[46ch] text-center"
               initial={reduced ? false : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ ...base, delay: 0.3 }}
+              transition={{ ...base, delay: 0.24 }}
             >
               {clip.topic ? (
-                <h2 className="display text-[20px] leading-snug text-ink">{clip.topic}</h2>
+                <h2 className="display text-[21px] leading-snug text-ink">{clip.topic}</h2>
               ) : clip.hook ? (
-                <h2 className="display text-[20px] leading-snug text-ink">“{clip.hook}”</h2>
+                <h2 className="display text-[21px] leading-snug text-ink">
+                  &ldquo;{clip.hook}&rdquo;
+                </h2>
               ) : null}
 
               {clip.why ? (
-                <p className="mt-3 text-[14px] leading-relaxed text-body">{clip.why}</p>
+                <p className="mt-3 text-[14.5px] leading-relaxed text-body">{clip.why}</p>
               ) : null}
 
               {clip.segments > 1 ? (
@@ -385,10 +405,10 @@ function StudioInner() {
             </motion.div>
 
             <motion.div
-              className="mt-6 flex items-center gap-3"
+              className="mt-7 flex items-center gap-3"
               initial={reduced ? false : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ ...base, delay: 0.38 }}
+              transition={{ ...base, delay: 0.32 }}
             >
               <Pill
                 onClick={() => {
@@ -400,12 +420,14 @@ function StudioInner() {
               >
                 Cut another
               </Pill>
-              <Pill variant="ghost" href="/app/library">
+              <Pill variant="outline" href="/app/library">
                 Open Library
               </Pill>
             </motion.div>
 
-            <p className="mt-4 text-[12.5px] text-muted">Saved to your device and your Library.</p>
+            <p className="mt-4 text-[12.5px] text-muted">
+              Saved to your device and your Library.
+            </p>
           </motion.div>
         ) : null}
       </AnimatePresence>

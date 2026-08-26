@@ -143,7 +143,7 @@ export function OnboardingFlow() {
                 {picked && !picking ? (
                   <div className="mt-8 rounded-[20px] bg-surface p-6 shadow-hairline">
                     <p className="eyebrow text-brand">Recommended</p>
-                    <h3 className="mt-3 font-display text-[28px] font-light">
+                    <h3 className="display mt-3 text-[26px]">
                       {picked.primary.label}
                     </h3>
                     <p className="mt-2 text-body">{picked.primary.blurb}</p>
@@ -183,7 +183,7 @@ export function OnboardingFlow() {
                   <p className="eyebrow text-brand">
                     {source === "picked" ? "Picked for you" : "Your pick"}
                   </p>
-                  <h3 className="mt-3 font-display text-[32px] font-light">
+                  <h3 className="display mt-3 text-[30px]">
                     {NICHES.find((n) => n.id === niche)?.label}
                   </h3>
                   <p className="mt-3 text-body">

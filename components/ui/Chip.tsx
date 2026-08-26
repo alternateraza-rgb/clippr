@@ -1,8 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { usePrefersReducedMotion } from "@/components/motion/usePrefersReducedMotion";
-import { springy } from "@/components/motion/presets";
 import { cn } from "@/lib/cn";
 
 export function Chip({
@@ -16,25 +13,52 @@ export function Chip({
   onClick?: () => void;
   className?: string;
 }) {
-  const reduced = usePrefersReducedMotion();
-
   return (
-    <motion.button
+    <button
       type="button"
       onClick={onClick}
-      whileHover={reduced ? undefined : { y: -1 }}
-      whileTap={reduced ? undefined : { scale: 0.97 }}
-      transition={springy}
+      aria-pressed={selected}
       className={cn(
-        "relative rounded-[var(--radius-control,9999px)] px-4 py-2 text-[13.5px]",
-        "transition-colors duration-[var(--dur-fast,140ms)] ease-[var(--ease-out-soft)]",
+        "inline-flex h-9 select-none items-center rounded-[var(--radius-pill)] px-4 text-[13.5px] font-medium",
+        "transition-colors duration-[var(--dur-fast)] ease-[var(--ease-out-soft)] active:scale-[0.98]",
         selected
-          ? "bg-ink text-on-brand shadow-hairline"
-          : "bg-surface text-body shadow-hairline hover:bg-surface-warm hover:text-ink",
+          ? "bg-ink text-on-brand"
+          : "bg-surface text-body shadow-[inset_0_0_0_1px_var(--color-hairline)] hover:bg-surface-warm hover:text-ink",
         className,
       )}
     >
       {children}
-    </motion.button>
+    </button>
+  );
+}
+
+/** Read-only counterpart: a label, not a control. */
+export function Tag({
+  children,
+  tone = "neutral",
+  className,
+}: {
+  children: React.ReactNode;
+  tone?: "neutral" | "brand" | "success" | "warn" | "dark";
+  className?: string;
+}) {
+  const tones = {
+    neutral: "bg-surface-warm text-body",
+    brand: "bg-brand-soft text-brand",
+    success: "bg-success-soft text-success",
+    warn: "bg-warn-soft text-warn",
+    dark: "bg-white/10 text-white/85",
+  } as const;
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-2.5 py-1 text-[11.5px] font-medium",
+        tones[tone],
+        className,
+      )}
+    >
+      {children}
+    </span>
   );
 }

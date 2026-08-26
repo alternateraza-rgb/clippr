@@ -1,35 +1,32 @@
-"use client";
-
-import { motion } from "framer-motion";
-import { usePrefersReducedMotion } from "@/components/motion/usePrefersReducedMotion";
-import { base } from "@/components/motion/presets";
 import { cn } from "@/lib/cn";
 
+/**
+ * A card is a hairline and a radius. Anything more — a drop shadow at rest, a
+ * gradient, a border that changes colour on hover — and a grid of them starts
+ * to buzz.
+ */
 export function Card({
   children,
   className,
-  hover = false,
+  interactive = false,
   onClick,
 }: {
   children: React.ReactNode;
   className?: string;
-  hover?: boolean;
+  interactive?: boolean;
   onClick?: () => void;
 }) {
-  const reduced = usePrefersReducedMotion();
-
   return (
-    <motion.div
+    <div
       onClick={onClick}
       className={cn(
-        "rounded-[var(--radius-card,20px)] bg-surface shadow-hairline",
-        onClick && "cursor-pointer",
+        "rounded-[var(--radius-card)] bg-surface shadow-hairline",
+        interactive &&
+          "cursor-pointer transition-shadow duration-[var(--dur-base)] ease-[var(--ease-out-soft)] hover:shadow-lift",
         className,
       )}
-      whileHover={hover && !reduced ? { y: -3, boxShadow: "var(--shadow-lift)" } : undefined}
-      transition={base}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }

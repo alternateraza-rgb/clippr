@@ -1,28 +1,23 @@
 import type { Metadata } from "next";
-import { Anton, Geist, Instrument_Serif, Inter_Tight } from "next/font/google";
+import { Anton, Inter, Schibsted_Grotesk } from "next/font/google";
 import { SessionHydrator } from "@/components/app/SessionHydrator";
 import { JobsProvider } from "@/lib/store/jobs";
 import { ProfileProvider } from "@/lib/store/profile";
 import "./globals.css";
 
-const geist = Geist({
-  variable: "--font-geist",
+/* Inter for everything you read, a tight grotesque for everything you notice. */
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
-const instrument = Inter_Tight({
-  variable: "--font-instrument",
+const grotesk = Schibsted_Grotesk({
+  variable: "--font-grotesk",
   subsets: ["latin"],
-  weight: ["300", "400", "500"],
+  weight: ["500", "600", "700"],
 });
 
-const serif = Instrument_Serif({
-  variable: "--font-serif-italic",
-  subsets: ["latin"],
-  weight: "400",
-  style: "italic",
-});
-
+/* Unchanged: this is the face burnt into the clips themselves. */
 const caption = Anton({
   variable: "--font-anton",
   subsets: ["latin"],
@@ -43,9 +38,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geist.variable} ${instrument.variable} ${serif.variable} ${caption.variable} h-full antialiased`}
+      className={`${inter.variable} ${grotesk.variable} ${caption.variable} h-full antialiased`}
     >
-      <body className="grain min-h-full bg-canvas text-ink">
+      <body className="min-h-full bg-canvas text-ink">
         <ProfileProvider>
           <JobsProvider>
             <SessionHydrator />

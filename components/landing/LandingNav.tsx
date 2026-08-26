@@ -1,31 +1,32 @@
 import Link from "next/link";
-import { Pill } from "@/components/ui/Pill";
+import { LandingAuthLinks } from "@/components/landing/LandingAuthLinks";
 import { Wordmark } from "@/components/ui/Wordmark";
+
+const LINKS = [
+  { href: "/#how", label: "How it works" },
+  { href: "/#get-paid", label: "The money" },
+  { href: "/#reviews", label: "Reviews" },
+  { href: "/pricing", label: "Pricing" },
+];
 
 export function LandingNav() {
   return (
-    <header className="sticky top-0 z-40 border-b border-hairline/70 bg-canvas/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-[1200px] items-center justify-between px-6">
-        <Wordmark />
-        <nav className="hidden items-center gap-8 text-[14px] text-body md:flex">
-          <a href="#how" className="hover:text-ink">
-            How it works
-          </a>
-          <a href="#reviews" className="hover:text-ink">
-            Reviews
-          </a>
-          <a href="#faq" className="hover:text-ink">
-            FAQ
-          </a>
-          <Link href="/pricing" className="hover:text-ink">
-            Pricing
-          </Link>
+    <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/85 backdrop-blur-md">
+      <div className="mx-auto flex h-[62px] max-w-[1120px] items-center justify-between gap-6 px-6">
+        <Wordmark size={20} />
+        <nav className="hidden items-center gap-7 text-[14px] text-body md:flex">
+          {LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="transition-colors duration-[var(--dur-fast)] hover:text-ink"
+            >
+              {link.label}
+            </Link>
+          ))}
         </nav>
         <div className="flex items-center gap-2">
-          <Pill href="/login" variant="text" className="hidden sm:inline-flex">
-            Log in
-          </Pill>
-          <Pill href="/signup">Start making money</Pill>
+          <LandingAuthLinks />
         </div>
       </div>
     </header>

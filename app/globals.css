@@ -1,37 +1,73 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Clipmuse design system
+
+   High-contrast, near-white, one hot accent. The type does the work: a tight
+   grotesque set large and set heavy, with the body copy in a plain neutral so
+   the display line is the only voice raised in the room. Decoration is spent
+   on two things only — the accent and real product surfaces (a clip, a
+   waveform, a frame) — never on gradients standing in for content.
+--------------------------------------------------------------------------- */
+
 @theme inline {
-  --color-canvas: #fdfcfc;
+  --color-canvas: #ffffff;
   --color-surface: #ffffff;
-  --color-surface-warm: #f5f3f1;
-  --color-surface-warm-alt: #edebe8;
-  --color-hairline: #d7d2cc;
-  --color-ink: #0c0a09;
-  --color-body: #57534e;
-  --color-muted: #777169;
-  --color-brand: #8f2430;
-  --color-brand-hover: #7a1e28;
-  --color-brand-press: #651820;
-  --color-brand-soft: #f6ebec;
-  --color-brand-tint: #c45a66;
-  --color-success: #2f6b4f;
-  --color-warn: #8a5a16;
-  --color-on-brand: #fdfcfc;
+  --color-surface-warm: #f6f6f6;
+  --color-surface-warm-alt: #ececec;
+  --color-hairline: #e6e6e6;
+  --color-hairline-strong: #d4d4d4;
 
-  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-instrument), var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-serif-italic), Georgia, "Times New Roman", serif;
+  --color-ink: #202020;
+  --color-body: #5c5c5c;
+  --color-muted: #8c8c8c;
+
+  /* The one hot colour. Used for a single action per screen, and for the mark. */
+  --color-brand: #ff4a17;
+  --color-brand-hover: #ee3f0d;
+  --color-brand-press: #d13508;
+  --color-brand-soft: #fff0eb;
+  --color-brand-tint: #ff8a63;
+  --color-on-brand: #ffffff;
+
+  /* Near-black, for anything that stands in for a screen or a piece of tape. */
+  --color-void: #101010;
+  --color-void-soft: #1c1c1c;
+  --color-void-line: #2c2c2c;
+
+  --color-success: #30a46c;
+  --color-success-soft: #e9f7f0;
+  --color-warn: #c2650f;
+  --color-warn-soft: #fdf2e5;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-grotesk), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-caption: var(--font-anton), Anton, Impact, "Arial Black", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
 
-  --shadow-hairline:
-    inset 0 0 0 0.5px rgb(0 0 0 / 0.06),
-    0 0 0 1px rgb(0 0 0 / 0.04),
-    0 4px 12px rgb(78 50 23 / 0.04);
+  /* Elevation is mostly a hairline. Shadow only where something genuinely
+     floats above the page — a menu, a sheet, a dragged thing. */
+  --shadow-hairline: 0 0 0 1px rgb(0 0 0 / 0.07);
   --shadow-lift:
-    inset 0 0 0 0.5px rgb(0 0 0 / 0.06),
-    0 0 0 1px rgb(0 0 0 / 0.04),
-    0 10px 28px rgb(78 50 23 / 0.08);
+    0 0 0 1px rgb(0 0 0 / 0.07),
+    0 6px 20px rgb(0 0 0 / 0.06);
+  --shadow-pop:
+    0 0 0 1px rgb(0 0 0 / 0.08),
+    0 24px 60px rgb(0 0 0 / 0.16);
+  --shadow-brand: 0 6px 20px rgb(255 74 23 / 0.28);
+
   --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+:root {
+  --radius-pill: 9999px;
+  --radius-control: 10px;
+  --radius-card: 14px;
+  --radius-panel: 20px;
+
+  --dur-fast: 130ms;
+  --dur-base: 220ms;
+  --dur-slow: 480ms;
 }
 
 html {
@@ -50,130 +86,122 @@ body {
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.5;
-  letter-spacing: 0.16px;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 ::selection {
-  background: var(--color-brand-soft);
-  color: var(--color-ink);
+  background: var(--color-brand);
+  color: var(--color-on-brand);
 }
 
-.grain {
-  position: relative;
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
-
-.grain::after {
-  content: "";
-  pointer-events: none;
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  opacity: 0.028;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.55'/></svg>");
-}
-
-
-
 
 @layer components {
+  /* The house voice. Tight, mid-weight, optically flush — the tracking has to
+     come off as the size goes up or it reads as a default h1. */
   .display {
     font-family: var(--font-display);
-    font-weight: 300;
-    letter-spacing: -0.02em;
-    line-height: 1.05;
-  }
-  .eyebrow {
-    font-size: 12px;
     font-weight: 500;
-    letter-spacing: 0.12em;
+    letter-spacing: -0.035em;
+    line-height: 1;
+  }
+
+  /* Above ~44px the letters need to close up further still. */
+  .display-xl {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.045em;
+    line-height: 0.95;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--color-muted);
   }
-  .serif-em {
-    font-family: var(--font-serif);
-    font-style: italic;
-    font-weight: 400;
+
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  .rule {
+    height: 1px;
+    background: var(--color-hairline);
+  }
+
+  /* A hairline that survives on a dark surface. */
+  .rule-dark {
+    height: 1px;
+    background: var(--color-void-line);
   }
 }
 
 /* ---------------------------------------------------------------------------
    Workspace
-   Denser than the landing page, but the same product. This used to override the
-   palette wholesale — zinc greys, no grain, heavier display type — which is why
-   signing up felt like landing in a different app. It now inherits the brand
-   and only adjusts what a tool actually needs: tighter rhythm, calmer surfaces,
-   a canvas that recedes behind content.
+   Same palette as the marketing site — signing in should not feel like landing
+   in a different product. It only tightens the rhythm and drops a faint grey
+   behind the content so cards read as cards.
 --------------------------------------------------------------------------- */
 .workspace {
-  --color-canvas: #faf8f7;
-  --color-surface: #ffffff;
-  --color-surface-warm: #f4f1ef;
-  --color-surface-warm-alt: #e9e5e1;
-  --color-hairline: #e3ded8;
-
-  /* Elevation reads as light on a warm surface, not a grey box shadow. */
-  --shadow-hairline:
-    inset 0 0 0 0.5px rgb(0 0 0 / 0.05),
-    0 1px 2px rgb(78 50 23 / 0.04);
-  --shadow-lift:
-    inset 0 0 0 0.5px rgb(0 0 0 / 0.05),
-    0 2px 4px rgb(78 50 23 / 0.03),
-    0 12px 28px rgb(78 50 23 / 0.09);
-  --shadow-pop:
-    inset 0 0 0 0.5px rgb(0 0 0 / 0.06),
-    0 24px 60px rgb(78 50 23 / 0.16);
-
-  --radius-control: 10px;
-  --radius-card: 16px;
-  --radius-panel: 22px;
-
-  --dur-fast: 140ms;
-  --dur-base: 240ms;
-  --dur-slow: 520ms;
-
+  --color-canvas: #fafafa;
   background: var(--color-canvas);
 }
 
-/* The display face carries the brand; keeping it light is most of the reason
-   the landing page looks considered. It was 500 here, which flattened it. */
 @layer components {
   .workspace .display {
-    font-weight: 300;
-    letter-spacing: -0.018em;
+    letter-spacing: -0.03em;
   }
 }
 
-/* Grain stays, quieter — at landing strength it fights dense UI. */
-body.grain:has(.workspace)::after {
-  opacity: 0.018;
-}
-
-/* Focus that belongs to the brand rather than the browser default. */
-.workspace :focus-visible {
-  outline: 2px solid var(--color-brand-tint);
-  outline-offset: 2px;
-  border-radius: var(--radius-control);
-}
-
-/* Numbers in a UI should not wobble as they count. */
-@layer components {
-  .workspace .tnum {
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum";
+/* Marquee rails used on the landing page for logo/proof strips. */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
   }
 }
 
-/* Hairline rule used between sections instead of a hard border. */
-@layer components {
-  .workspace .rule {
-    height: 1px;
-    background: linear-gradient(
-      to right,
-      var(--color-hairline),
-      color-mix(in srgb, var(--color-hairline) 30%, transparent)
-    );
+@keyframes sweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* The caption chip pop used in clip previews and the studio stage. */
+@keyframes pop-in {
+  0% {
+    transform: scale(0.82);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* A slow drift for the accent glow behind product shots. Deliberately the only
+   ambient animation in the system. */
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2%, -3%, 0) scale(1.06);
   }
 }
 
@@ -185,12 +213,5 @@ body.grain:has(.workspace)::after {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-}
-
-
-@keyframes sweep {
-  100% {
-    transform: translateX(100%);
   }
 }

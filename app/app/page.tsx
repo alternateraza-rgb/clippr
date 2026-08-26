@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { VideoCard } from "@/components/app/VideoCard";
-import { PageHeader } from "@/components/app/PageHeader";
-import { Field } from "@/components/ui/Field";
+import { ArrowRight, RefreshCw, Sparkles } from "lucide-react";
+import { IdeaCard } from "@/components/app/IdeaCard";
+import { IdeaSheet } from "@/components/app/IdeaSheet";
 import { Pill } from "@/components/ui/Pill";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { nicheById } from "@/lib/fixtures/niches";
@@ -14,6 +14,7 @@ import { useDiscovery } from "@/lib/hooks/useDiscovery";
 import { useJobs } from "@/lib/store/jobs";
 import { useProfile } from "@/lib/store/profile";
 import { isYouTubeUrl } from "@/lib/youtube";
+import type { DiscoveryItem } from "@/lib/agent/types";
 
 export default function HomePage() {
   const { profile } = useProfile();
@@ -24,8 +25,9 @@ export default function HomePage() {
   const niche = nicheById(profile.niche);
   const { items: ideas, loading, live, refresh } = useDiscovery(profile.niche);
   const [stocking, setStocking] = useState(false);
+  const [open, setOpen] = useState<DiscoveryItem | null>(null);
+
   const viral = ideas.slice(0, 6);
-  const teaser = ideas.slice(0, 3);
 
   async function restock() {
     setStocking(true);
@@ -33,7 +35,11 @@ export default function HomePage() {
       await fetch("/api/discovery/bootstrap", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ niche: profile.niche, interests: profile.interests, platforms: profile.platforms }),
+        body: JSON.stringify({
+          niche: profile.niche,
+          interests: profile.interests,
+          platforms: profile.platforms,
+        }),
       });
       refresh();
     } finally {
@@ -51,118 +57,67 @@ export default function HomePage() {
   }
 
   return (
-    <div>
-      <PageHeader
-        eyebrow={niche.label}
-        title={greetingForNow(profile.displayName)}
-        lede="Paste a longform video, or take one of today's cuts. The agent already knows your niche."
-      />
+    <div className="pb-4">
+      <p className="eyebrow text-brand">{niche.label}</p>
+      <h1 className="display mt-2.5 text-[clamp(28px,3.8vw,42px)] text-ink">
+        {greetingForNow(profile.displayName)}
+      </h1>
 
-      <div className="mt-9 max-w-[640px]">
-        <Field
-          value={url}
-          onChange={(v) => {
-            setUrl(v);
-            setError("");
-          }}
-          onSubmit={go}
-          submitLabel="Clip it"
-          placeholder="Paste a YouTube link"
-        />
-        {error ? <p className="mt-3 text-[13px] text-brand">{error}</p> : null}
-      </div>
+      {/* The one thing this page is for. Dark so it reads as the primary
+          surface rather than another card in a stack of cards. */}
+      <section className="mt-7 overflow-hidden rounded-[var(--radius-panel)] bg-void p-6 text-white md:p-8">
+        <h2 className="display text-[21px] text-white md:text-[24px]">
+          Paste a long video. Get one clip worth posting.
+        </h2>
+        <p className="mt-2 max-w-[52ch] text-[14.5px] leading-relaxed text-white/60">
+          Clipmuse listens to the whole thing, picks the strongest minute, and
+          edits it — captions burned in, framed vertical, ready to upload.
+        </p>
 
-      <section className="mt-16">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <p className="eyebrow text-muted">Potentially viral</p>
-            <h2 className="display mt-2 text-[21px] text-ink">
-              Longform that fits {niche.label.toLowerCase()}
-            </h2>
-          </div>
+        <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
+          <input
+            value={url}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              setError("");
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") go();
+            }}
+            placeholder="https://youtube.com/watch?v=…"
+            aria-label="YouTube link"
+            className="min-w-0 flex-1 rounded-[var(--radius-pill)] bg-white/10 px-5 py-3.5 text-[15px] text-white outline-none ring-1 ring-inset ring-white/15 transition-shadow placeholder:text-white/40 focus:ring-2 focus:ring-white/60"
+          />
+          <button
+            type="button"
+            onClick={go}
+            className="shrink-0 rounded-[var(--radius-pill)] bg-brand px-7 py-3.5 text-[15px] font-semibold text-on-brand shadow-[inset_0_1px_0_rgb(255_255_255/0.22)] transition-colors hover:bg-brand-hover active:scale-[0.98]"
+          >
+            Clip it
+          </button>
         </div>
-        {loading ? (
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-[16/11]" />
-            ))}
-          </div>
-        ) : viral.length === 0 ? (
-          <div className="mt-5 rounded-[var(--radius-card,16px)] bg-surface p-6 shadow-hairline">
-            <p className="text-body">
-              {live
-                ? "No longform in the feed yet. We’ll search YouTube for this niche."
-                : "Add YOUTUBE_API_KEY to research real longform."}
-            </p>
-            <div className="mt-4">
-              <Pill onClick={restock} disabled={stocking}>
-                {stocking ? "Researching…" : "Find videos"}
-              </Pill>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {viral.map((item) => (
-              <VideoCard key={item.id} item={item} />
-            ))}
-          </div>
-        )}
-      </section>
 
-      <section className="mt-16">
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="eyebrow text-muted">Today&apos;s ideas</p>
-            <h2 className="display mt-2 text-[21px] text-ink">
-              Three you could cut before noon
-            </h2>
-          </div>
-          <Pill href="/app/ideas" variant="text">
-            All ideas
-          </Pill>
-        </div>
-        {loading ? (
-          <div className="mt-5 grid gap-3">
-            <Skeleton className="h-[70px]" />
-            <Skeleton className="h-[70px]" />
-          </div>
-        ) : teaser.length === 0 ? null : (
-          <div className="mt-5 grid gap-3">
-            {teaser.map((item) => (
-              <Link
-                key={item.id}
-                href={`/app/studio?v=${item.video.videoId}`}
-                // min-w-0: a grid item defaults to min-width:auto, so the
-                // truncating text below pushes the whole row past the viewport.
-                className="group flex min-w-0 items-center justify-between gap-4 rounded-[var(--radius-card,16px)] bg-surface px-5 py-4 shadow-hairline transition-all duration-[var(--dur-base,240ms)] ease-[var(--ease-out-soft)] hover:-translate-y-[2px] hover:shadow-lift"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-[15px] font-medium text-ink">
-                    {item.hook}
-                  </p>
-                  <p className="mt-1 truncate text-[13px] text-muted">
-                    {item.video.channel} · {item.estimatedClipCount} possible cuts
-                  </p>
-                </div>
-                <span className="tnum shrink-0 text-[14px] text-brand">{item.score}</span>
-              </Link>
-            ))}
-          </div>
-        )}
+        {error ? <p className="mt-3 text-[13.5px] text-brand-tint">{error}</p> : null}
+
+        <p className="mt-4 text-[12.5px] text-white/40">
+          Works best on 8 minutes or more — podcasts, interviews, streams, sermons.
+        </p>
       </section>
 
       {jobs.length ? (
-        <section className="mt-16">
-          <p className="eyebrow text-muted">Recent clips</p>
-          <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
+        <section className="mt-10">
+          <h2 className="eyebrow text-ink">Picking up where you left off</h2>
+          <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
             {jobs.slice(0, 6).map((job) => (
               <Link
                 key={job.id}
                 href={`/app/studio?v=${job.video.videoId}&clip=${job.candidate.id}`}
-                className="min-w-[220px] rounded-[var(--radius-card,16px)] bg-surface p-4 shadow-hairline transition-all duration-[var(--dur-base,240ms)] hover:-translate-y-[2px] hover:shadow-lift"
+                className="min-w-[240px] rounded-[var(--radius-card)] bg-surface p-4 shadow-hairline transition-shadow duration-[var(--dur-base)] hover:shadow-lift"
               >
-                <p className="text-[12px] capitalize text-muted">{job.status}</p>
-                <p className="mt-2 line-clamp-2 text-[14px] font-medium text-ink">
+                <p className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-brand">
+                  {job.status}
+                </p>
+                <p className="mt-2 line-clamp-2 text-[14px] font-medium leading-snug text-ink">
                   {job.candidate.hook}
                 </p>
               </Link>
@@ -170,6 +125,75 @@ export default function HomePage() {
           </div>
         </section>
       ) : null}
+
+      <section className="mt-12">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="eyebrow text-ink">Worth cutting today</h2>
+            <p className="mt-2 text-[15px] text-body">
+              Longform in {niche.label.toLowerCase()} that hasn&apos;t been clipped yet.
+            </p>
+          </div>
+          <Pill
+            href="/app/ideas"
+            variant="text"
+            size="sm"
+            icon={<ArrowRight className="h-4 w-4 order-2" strokeWidth={2} />}
+          >
+            All ideas
+          </Pill>
+        </div>
+
+        {loading ? (
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 3 }, (_, i) => (
+              <Skeleton key={i} className="aspect-[16/11]" />
+            ))}
+          </div>
+        ) : viral.length === 0 ? (
+          <EmptyFeed live={live} stocking={stocking} onRestock={restock} />
+        ) : (
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {viral.map((item) => (
+              <IdeaCard key={item.id} item={item} onOpen={() => setOpen(item)} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <IdeaSheet item={open} onClose={() => setOpen(null)} />
+    </div>
+  );
+}
+
+function EmptyFeed({
+  live,
+  stocking,
+  onRestock,
+}: {
+  live: boolean;
+  stocking: boolean;
+  onRestock: () => void;
+}) {
+  return (
+    <div className="mt-5 rounded-[var(--radius-card)] bg-surface p-8 text-center shadow-hairline">
+      <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-brand-soft">
+        <Sparkles className="h-5 w-5 text-brand" strokeWidth={2} />
+      </span>
+      <p className="mx-auto mt-4 max-w-[42ch] text-[15px] leading-relaxed text-body">
+        {live
+          ? "Nothing in the feed yet for this niche. Send the agent out to research it."
+          : "Add YOUTUBE_API_KEY to research real longform, or paste a link above."}
+      </p>
+      <div className="mt-5">
+        <Pill
+          onClick={onRestock}
+          loading={stocking}
+          icon={<RefreshCw className="h-4 w-4" strokeWidth={2} />}
+        >
+          {stocking ? "Researching…" : "Find videos"}
+        </Pill>
+      </div>
     </div>
   );
 }

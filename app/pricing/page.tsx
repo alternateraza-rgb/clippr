@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { PricingPlan } from "@/components/landing/PricingPlan";
+import { StartCta } from "@/components/landing/StartCta";
 import { Reveal } from "@/components/motion/Reveal";
-import { Pill } from "@/components/ui/Pill";
 
 export const metadata: Metadata = {
   title: "Pricing — Clipmuse",
@@ -35,30 +35,28 @@ export default function PricingPage() {
       <LandingNav />
       <PricingPlan />
 
-      <section className="bg-surface-warm py-24">
-        <div className="mx-auto max-w-[1200px] px-6">
+      <section className="bg-surface-warm px-6 py-20 md:py-28">
+        <div className="mx-auto max-w-[1120px]">
           <Reveal>
-            <p className="eyebrow">Questions</p>
+            <p className="eyebrow text-brand">Questions</p>
             <h2 className="display mt-4 max-w-[18ch] text-[clamp(30px,4.4vw,44px)]">
-              What you&apos;re <em className="serif-em">paying for</em>.
+              What you&apos;re <span className="text-brand">paying for</span>.
             </h2>
           </Reveal>
 
-          <div className="mt-12 grid gap-x-16 gap-y-10 md:grid-cols-2">
-            {FAQS.map((item, i) => (
-              <Reveal key={item.q} delay={0.05 * i}>
+          <Reveal className="mt-12 grid gap-x-16 gap-y-10 md:grid-cols-2">
+            {FAQS.map((item) => (
+              <div key={item.q}>
                 <p className="text-[17px] font-medium text-ink">{item.q}</p>
                 <p className="mt-2 max-w-[48ch] text-[15px] leading-relaxed text-body">{item.a}</p>
-              </Reveal>
+              </div>
             ))}
-          </div>
+          </Reveal>
 
           <Reveal delay={0.1}>
             <div className="mt-16 flex flex-wrap items-center gap-4 border-t border-hairline pt-10">
               <p className="text-[15px] text-body">Ready when you are.</p>
-              <Pill href="/signup" className="px-6 py-3">
-                Start clipping
-              </Pill>
+              <StartCta size="lg">Start clipping</StartCta>
             </div>
           </Reveal>
         </div>

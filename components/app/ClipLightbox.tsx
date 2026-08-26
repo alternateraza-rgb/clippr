@@ -61,7 +61,7 @@ export function ClipLightbox({
               autoPlay
               loop
               playsInline
-              className="max-h-[70vh] rounded-[var(--radius-panel,22px)] bg-black shadow-pop"
+              className="max-h-[70vh] rounded-[var(--radius-panel)] bg-black shadow-pop"
             />
 
             <div className="flex w-full max-w-[46ch] flex-col items-center gap-3 text-center">

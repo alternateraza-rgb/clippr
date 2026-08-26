@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { Check } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { usePrefersReducedMotion } from "@/components/motion/usePrefersReducedMotion";
-import { base } from "@/components/motion/presets";
+import { thumbnailFor } from "@/lib/youtube";
 import { cn } from "@/lib/cn";
 
 export type StageId = "read" | "transcribe" | "choose" | "cut" | "edit" | "done";
@@ -13,15 +12,64 @@ export type StageId = "read" | "transcribe" | "choose" | "cut" | "edit" | "done"
  * `at` is the progress value this stage begins at, so the rail and the bar are
  * driven by the same numbers the worker actually reports.
  */
-const STAGES: { id: StageId; label: string; detail: string; at: number }[] = [
-  { id: "read", label: "Reading the video", detail: "Pulling the tape and its metadata", at: 0 },
-  { id: "transcribe", label: "Listening to all of it", detail: "Every word, with timings", at: 8 },
-  { id: "choose", label: "Deciding what it is about", detail: "Picking a topic and the moments that tell it", at: 20 },
-  { id: "cut", label: "Gathering the moments", detail: "Pulling each piece from the tape", at: 30 },
-  { id: "edit", label: "Editing", detail: "Cuts, framing, captions on the beat", at: 48 },
+const STAGES: { id: StageId; label: string; detail: string; short: string; at: number }[] = [
+  {
+    id: "read",
+    label: "Reading the video",
+    detail: "Pulling the tape and its metadata",
+    short: "Read",
+    at: 0,
+  },
+  {
+    id: "transcribe",
+    label: "Listening to all of it",
+    detail: "Every word, timed to the audio",
+    short: "Listen",
+    at: 8,
+  },
+  {
+    id: "choose",
+    label: "Deciding what it is about",
+    detail: "Picking a topic and the moments that tell it",
+    short: "Choose",
+    at: 20,
+  },
+  {
+    id: "cut",
+    label: "Gathering the moments",
+    detail: "Pulling each piece off the tape",
+    short: "Cut",
+    at: 30,
+  },
+  {
+    id: "edit",
+    label: "Editing",
+    detail: "Framing, punch-ins, captions on the beat",
+    short: "Edit",
+    at: 48,
+  },
 ];
 
 const ORDER: StageId[] = ["read", "transcribe", "choose", "cut", "edit", "done"];
+
+/** Deterministic bar heights, so the waveform belongs to this video. */
+function waveform(seed: string, count: number) {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Array.from({ length: count }, (_, i) => {
+    h ^= h << 13;
+    h ^= h >>> 17;
+    h ^= h << 5;
+    const base = ((h >>> 0) % 100) / 100;
+    // Speech sits in a band rather than spanning the full range; a waveform
+    // that touches 0 and 1 every other bar reads as random noise.
+    const envelope = 0.45 + 0.4 * Math.sin((i / count) * Math.PI * 3.1);
+    return Math.max(0.12, Math.min(1, base * 0.55 + envelope * 0.6));
+  });
+}
 
 function useElapsed(active: boolean) {
   const [seconds, setSeconds] = useState(0);
@@ -39,132 +87,214 @@ function useElapsed(active: boolean) {
   return seconds;
 }
 
+const CAPTION_BEATS = ["THIS IS THE", "PART NOBODY", "TALKS ABOUT"];
+
 export function RenderStage({
   stage,
   progress,
   note,
+  videoId,
   className,
 }: {
   stage: StageId;
   /** 0-100, from the render row. */
   progress: number;
   note?: string;
+  videoId?: string;
   className?: string;
 }) {
   const reduced = usePrefersReducedMotion();
-  const activeIndex = ORDER.indexOf(stage);
+  const index = ORDER.indexOf(stage);
   const elapsed = useElapsed(stage !== "done");
+  const bars = useMemo(() => waveform(videoId ?? "clipmuse", 56), [videoId]);
+  const current = STAGES[Math.min(index, STAGES.length - 1)];
+
+  // Past "choose" the tape stops being a 16:9 source and becomes the vertical
+  // clip being built. The frame narrowing is the whole story of the product.
+  const vertical = index >= ORDER.indexOf("cut");
+  const pct = Math.max(2, Math.min(100, progress));
 
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[var(--radius-panel,22px)] bg-surface shadow-lift",
+        "overflow-hidden rounded-[var(--radius-panel)] bg-void text-white",
         className,
       )}
     >
-      {/* Brand light behind the panel, drifting. The landing page uses the same
-          gradient — it is the one piece of decoration the app owns. */}
-      {!reduced ? (
+      <div className="flex items-center justify-between gap-4 px-6 pt-6">
+        <p className="eyebrow text-brand">Making your clip</p>
+        <p className="tnum text-[12.5px] text-white/45">
+          {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}
+        </p>
+      </div>
+
+      {/* The tape */}
+      <div className="px-6 pt-6">
         <motion.div
-          aria-hidden
-          className="pointer-events-none absolute -right-24 -top-28 h-[320px] w-[320px] rounded-full blur-3xl"
-          style={{
-            background:
-              "radial-gradient(circle at 30% 30%, rgba(196,90,102,0.30), rgba(143,36,48,0.10) 45%, rgba(253,252,252,0) 72%)",
-          }}
-          animate={{ x: [0, 20, -10, 0], y: [0, 14, -8, 0], opacity: [0.75, 1, 0.8] }}
-          transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
-        />
-      ) : null}
+          className="relative mx-auto overflow-hidden rounded-[14px] bg-black"
+          animate={{ maxWidth: vertical ? 232 : 640, aspectRatio: vertical ? 9 / 16 : 16 / 9 }}
+          initial={false}
+          transition={
+            reduced ? { duration: 0 } : { type: "spring", stiffness: 120, damping: 24, mass: 1 }
+          }
+          style={{ width: "100%" }}
+        >
+          {videoId ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={thumbnailFor(videoId)}
+              alt=""
+              className={cn(
+                "absolute inset-0 h-full w-full object-cover transition-all duration-[1200ms] ease-[var(--ease-out-soft)]",
+                index >= ORDER.indexOf("choose") ? "opacity-70 saturate-100" : "opacity-45 saturate-50",
+                vertical && "scale-[1.9]",
+              )}
+            />
+          ) : (
+            <div className="absolute inset-0 bg-void-soft" />
+          )}
 
-      <div className="relative p-7 md:p-9">
-        <div className="flex items-baseline justify-between gap-4">
-          <p className="eyebrow text-brand">Making your clip</p>
-          <p className="tnum text-[12px] text-muted">
-            {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}
-          </p>
-        </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30" />
 
-        <h2 className="display mt-3 text-[24px] text-ink">
-          {stage === "done" ? "Ready" : "This takes a minute or two"}
-        </h2>
+          {/* Reading: a single line sweeps the tape. */}
+          {stage === "read" && !reduced ? (
+            <motion.div
+              aria-hidden
+              className="absolute inset-y-0 w-[2px] bg-brand shadow-[0_0_24px_6px_rgb(255_74_23/0.55)]"
+              animate={{ left: ["-2%", "102%"] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+            />
+          ) : null}
 
-        <div className="mt-6 h-[3px] w-full overflow-hidden rounded-full bg-surface-warm-alt">
+          {/* Listening: the waveform is the work. */}
+          <AnimatePresence>
+            {stage === "transcribe" ? (
+              <motion.div
+                key="wave"
+                className="absolute inset-x-0 bottom-0 flex h-[46%] items-end gap-[2px] px-4 pb-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                {bars.map((height, i) => (
+                  <motion.span
+                    key={i}
+                    className="flex-1 rounded-full bg-white/85"
+                    style={{ height: `${height * 100}%` }}
+                    animate={reduced ? undefined : { scaleY: [1, 0.35, 1] }}
+                    transition={
+                      reduced
+                        ? undefined
+                        : {
+                            duration: 1.1,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                            delay: (i % 14) * 0.06,
+                          }
+                    }
+                  />
+                ))}
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+
+          {/* Editing: what actually gets burned in. */}
+          <AnimatePresence>
+            {stage === "edit" || stage === "done" ? (
+              <motion.div
+                key="caption"
+                className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 p-4"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+              >
+                {CAPTION_BEATS.map((line, i) => (
+                  <motion.span
+                    key={line}
+                    className="font-caption rounded-[6px] bg-black px-2 py-0.5 text-[13px] uppercase leading-tight tracking-[-0.03em] text-white"
+                    initial={reduced ? { opacity: 1 } : { opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: reduced ? 0 : 0.25 + i * 0.22, type: "spring", stiffness: 420, damping: 22 }}
+                  >
+                    {line}
+                  </motion.span>
+                ))}
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </motion.div>
+
+        {/* The window on the source, narrowing to the chosen span. */}
+        <div className="relative mx-auto mt-4 h-[5px] max-w-[640px] overflow-hidden rounded-full bg-white/12">
           <motion.div
-            className="h-full rounded-full bg-brand"
-            initial={{ width: 0 }}
-            animate={{ width: `${Math.max(2, Math.min(100, progress))}%` }}
-            transition={{ duration: reduced ? 0 : 0.8, ease: [0.2, 0.8, 0.2, 1] }}
+            className="absolute inset-y-0 rounded-full bg-brand"
+            initial={false}
+            animate={
+              index >= ORDER.indexOf("choose")
+                ? { left: "34%", right: "48%" }
+                : { left: "0%", right: "0%" }
+            }
+            transition={reduced ? { duration: 0 } : { duration: 1.1, ease: [0.2, 0.8, 0.2, 1] }}
+            style={{ opacity: index >= ORDER.indexOf("choose") ? 1 : 0.25 }}
           />
         </div>
+      </div>
 
-        <ol className="mt-7 space-y-1">
+      {/* What it is doing, in one line. */}
+      <div className="px-6 pb-6 pt-7">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={stage}
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, y: -8 }}
+            transition={{ duration: 0.28, ease: [0.2, 0.8, 0.2, 1] }}
+          >
+            <h2 className="display text-[24px] text-white md:text-[27px]">
+              {stage === "done" ? "Ready" : current.label}
+            </h2>
+            <p className="mt-2 line-clamp-2 min-h-[21px] text-[14.5px] text-white/55">
+              {note || current.detail}
+            </p>
+          </motion.div>
+        </AnimatePresence>
+
+        {/* The rail: where you are, without a five-row checklist. */}
+        <ol className="mt-7 flex items-center gap-1.5">
           {STAGES.map((item, i) => {
-            const done = activeIndex > i;
-            const active = activeIndex === i;
+            const done = index > i;
+            const active = index === i;
             return (
-              <li
-                key={item.id}
-                className={cn(
-                  "flex items-start gap-3 rounded-[var(--radius-control,10px)] px-3 py-2.5 transition-colors",
-                  active && "bg-surface-warm/70",
-                )}
-              >
-                <span className="relative mt-[2px] flex h-[18px] w-[18px] shrink-0 items-center justify-center">
-                  {done ? (
-                    <motion.span
-                      initial={reduced ? false : { scale: 0.4, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={base}
-                      className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-brand"
-                    >
-                      <Check className="h-3 w-3 text-on-brand" strokeWidth={3} />
-                    </motion.span>
-                  ) : active ? (
-                    <>
-                      {!reduced ? (
-                        <motion.span
-                          className="absolute h-[18px] w-[18px] rounded-full bg-brand"
-                          animate={{ scale: [1, 1.6, 1], opacity: [0.4, 0, 0.4] }}
-                          transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }}
-                        />
-                      ) : null}
-                      <span className="relative h-[9px] w-[9px] rounded-full bg-brand" />
-                    </>
-                  ) : (
-                    <span className="h-[7px] w-[7px] rounded-full bg-hairline" />
-                  )}
+              <li key={item.id} className="flex min-w-0 flex-1 flex-col gap-2">
+                <span className="h-[3px] overflow-hidden rounded-full bg-white/12">
+                  <motion.span
+                    className="block h-full rounded-full bg-brand"
+                    initial={false}
+                    animate={{ width: done ? "100%" : active ? "55%" : "0%" }}
+                    transition={{ duration: reduced ? 0 : 0.6, ease: [0.2, 0.8, 0.2, 1] }}
+                  />
                 </span>
-
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={cn(
-                      "text-[14.5px] transition-colors",
-                      active ? "font-medium text-ink" : done ? "text-body" : "text-muted",
-                    )}
-                  >
-                    {item.label}
-                  </p>
-                  {active ? (
-                    <motion.p
-                      key={note || item.detail}
-                      className="mt-1 line-clamp-2 text-[13px] text-muted"
-                      initial={reduced ? false : { opacity: 0, y: -4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={base}
-                    >
-                      {note || item.detail}
-                    </motion.p>
-                  ) : null}
-                </div>
+                <span
+                  className={cn(
+                    "truncate text-[11px] font-medium transition-colors",
+                    active ? "text-white" : done ? "text-white/50" : "text-white/25",
+                  )}
+                >
+                  {item.short}
+                </span>
               </li>
             );
           })}
         </ol>
+      </div>
 
-        <p className="mt-6 border-t border-hairline pt-5 text-[13px] text-muted">
-          You can leave this page — the clip downloads on its own when it is done.
-        </p>
+      <div className="h-[3px] w-full bg-white/10">
+        <motion.div
+          className="h-full bg-brand"
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: reduced ? 0 : 0.8, ease: [0.2, 0.8, 0.2, 1] }}
+        />
       </div>
     </div>
   );

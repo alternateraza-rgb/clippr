@@ -1,3 +1,5 @@
+import { Plus } from "lucide-react";
+import { Band, SectionHead } from "@/components/landing/Section";
 import { Reveal } from "@/components/motion/Reveal";
 
 const FAQS = [
@@ -17,31 +19,49 @@ const FAQS = [
     q: "How do I actually get paid?",
     a: "Platform payouts, getting paid to clip for other creators, or growing your own page for brand deals — most people combine more than one.",
   },
+  {
+    q: "What do I need to run it?",
+    a: "A browser and a link. Clips render on our side and download to your device the moment they're finished.",
+  },
+  {
+    q: "Can I cancel?",
+    a: "Any time. Your plan stops at the end of the month you already paid for, and your library stays downloadable.",
+  },
 ];
 
 export function LandingFAQ() {
   return (
-    <section id="faq" className="bg-surface-warm py-28">
-      <div className="mx-auto max-w-[1200px] px-6">
+    <Band id="faq">
+      <div className="grid gap-12 md:grid-cols-[minmax(0,340px)_1fr] md:gap-16">
+        <SectionHead
+          eyebrow="Questions"
+          title={
+            <>
+              Before you <span className="text-brand">start</span>.
+            </>
+          }
+        />
         <Reveal>
-          <p className="eyebrow">Questions</p>
-          <h2 className="display mt-4 max-w-[16ch] text-[clamp(32px,5vw,48px)]">
-            Before you <em className="serif-em">start</em>.
-          </h2>
-        </Reveal>
-        <div className="mt-12 grid gap-5 md:grid-cols-2">
-          {FAQS.map((faq, i) => (
-            <Reveal key={faq.q} delay={i * 0.06}>
-              <article className="rounded-[20px] bg-surface p-8 shadow-hairline">
-                <h3 className="font-display text-[20px] font-light tracking-tight">
+          {/* <details> rather than state: it opens before hydration, it is
+              keyboard-operable for free, and Cmd-F finds closed answers. */}
+          <div className="divide-y divide-hairline border-y border-hairline">
+            {FAQS.map((faq) => (
+              <details key={faq.q} className="group">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-[17px] font-medium text-ink marker:hidden [&::-webkit-details-marker]:hidden">
                   {faq.q}
-                </h3>
-                <p className="mt-3 text-body">{faq.a}</p>
-              </article>
-            </Reveal>
-          ))}
-        </div>
+                  <Plus
+                    className="h-4 w-4 shrink-0 text-muted transition-transform duration-[var(--dur-base)] ease-[var(--ease-out-soft)] group-open:rotate-45"
+                    strokeWidth={2}
+                  />
+                </summary>
+                <p className="max-w-[56ch] pb-6 text-[15px] leading-relaxed text-body">
+                  {faq.a}
+                </p>
+              </details>
+            ))}
+          </div>
+        </Reveal>
       </div>
-    </section>
+    </Band>
   );
 }

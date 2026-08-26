@@ -70,8 +70,8 @@ export function ClipCard({
     >
       <div
         className={cn(
-          "relative aspect-[9/16] overflow-hidden rounded-[var(--radius-card,16px)] bg-ink",
-          "shadow-hairline transition-shadow duration-[var(--dur-base,240ms)] group-hover:shadow-lift",
+          "relative aspect-[9/16] overflow-hidden rounded-[var(--radius-card)] bg-ink",
+          "shadow-hairline transition-shadow duration-[var(--dur-base)] group-hover:shadow-lift",
         )}
       >
         <video
@@ -90,13 +90,13 @@ export function ClipCard({
         <div
           className={cn(
             "pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/70 via-ink/5 to-transparent",
-            "opacity-90 transition-opacity duration-[var(--dur-base,240ms)] group-hover:opacity-100",
+            "opacity-90 transition-opacity duration-[var(--dur-base)] group-hover:opacity-100",
           )}
         />
 
         {!hovering ? (
           <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-canvas/85 shadow-lift backdrop-blur-sm transition-transform duration-[var(--dur-base,240ms)] group-hover:scale-110">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-canvas/85 shadow-lift backdrop-blur-sm transition-transform duration-[var(--dur-base)] group-hover:scale-110">
               <Play className="ml-0.5 h-5 w-5 text-ink" strokeWidth={2} fill="currentColor" />
             </span>
           </span>
@@ -115,7 +115,7 @@ export function ClipCard({
           className={cn(
             "absolute left-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-full",
             "bg-canvas/85 text-ink shadow-hairline backdrop-blur-sm",
-            "opacity-0 transition-all duration-[var(--dur-base,240ms)] group-hover:opacity-100 hover:scale-105",
+            "opacity-0 transition-all duration-[var(--dur-base)] group-hover:opacity-100 hover:scale-105",
             saving && "opacity-100",
           )}
         >

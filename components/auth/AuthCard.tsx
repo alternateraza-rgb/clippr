@@ -1,10 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { Suspense, useActionState, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { login, signup, type AuthState } from "@/app/auth/actions";
-import { Orb } from "@/components/motion/Orb";
+import { AuthShell } from "@/components/auth/AuthShell";
 import { Pill } from "@/components/ui/Pill";
-import { Wordmark } from "@/components/ui/Wordmark";
 import { hasSupabase } from "@/lib/config";
 import { useProfile } from "@/lib/store/profile";
 
@@ -17,7 +17,6 @@ export function AuthCard({
   href,
   showName,
   footer,
-  initialError,
 }: {
   title: string;
   subtitle: string;
@@ -25,7 +24,6 @@ export function AuthCard({
   href: string;
   showName?: boolean;
   footer: React.ReactNode;
-  initialError?: string;
 }) {
   const { profile, setProfile } = useProfile();
   const [name, setName] = useState(profile.displayName);
@@ -37,16 +35,16 @@ export function AuthCard({
 
   if (state.checkEmail) {
     return (
-      <Shell title="Check your email." subtitle="Confirm the link we sent, then you’ll land in onboarding.">
+      <AuthShell title="Check your email." subtitle="Confirm the link we sent, then you’ll land in onboarding.">
         <p className="mt-8 text-[14px] text-muted">{footer}</p>
-      </Shell>
+      </AuthShell>
     );
   }
 
   return (
-    <Shell title={title} subtitle={subtitle}>
+    <AuthShell title={title} subtitle={subtitle}>
       <form
-        className="mt-10 space-y-3"
+        className="mt-8 space-y-2.5"
         action={formAction}
         onSubmit={() => {
           if (showName && name.trim()) {
@@ -61,7 +59,7 @@ export function AuthCard({
             onChange={(e) => setName(e.target.value)}
             placeholder="Your name"
             autoComplete="name"
-            className="w-full rounded-full bg-surface px-5 py-3 text-[15px] shadow-hairline outline-none placeholder:text-muted"
+            className="w-full rounded-[var(--radius-pill)] bg-surface px-5 py-3.5 text-[15px] text-ink outline-none shadow-[inset_0_0_0_1px_var(--color-hairline)] transition-shadow placeholder:text-muted focus:shadow-[inset_0_0_0_1.5px_var(--color-ink)]"
           />
         ) : null}
         <input
@@ -70,7 +68,7 @@ export function AuthCard({
           required={authEnabled}
           autoComplete="email"
           placeholder="Email"
-          className="w-full rounded-full bg-surface px-5 py-3 text-[15px] shadow-hairline outline-none placeholder:text-muted"
+          className="w-full rounded-[var(--radius-pill)] bg-surface px-5 py-3.5 text-[15px] text-ink outline-none shadow-[inset_0_0_0_1px_var(--color-hairline)] transition-shadow placeholder:text-muted focus:shadow-[inset_0_0_0_1.5px_var(--color-ink)]"
         />
         <input
           type="password"
@@ -79,16 +77,23 @@ export function AuthCard({
           autoComplete={showName ? "new-password" : "current-password"}
           placeholder="Password"
           minLength={authEnabled ? 6 : undefined}
-          className="w-full rounded-full bg-surface px-5 py-3 text-[15px] shadow-hairline outline-none placeholder:text-muted"
+          className="w-full rounded-[var(--radius-pill)] bg-surface px-5 py-3.5 text-[15px] text-ink outline-none shadow-[inset_0_0_0_1px_var(--color-hairline)] transition-shadow placeholder:text-muted focus:shadow-[inset_0_0_0_1.5px_var(--color-ink)]"
         />
-        {state.error || initialError ? (
-          <p className="text-[13px] text-brand">{state.error || initialError}</p>
-        ) : null}
+        {state.error ? (
+          <ErrorLine>{state.error}</ErrorLine>
+        ) : (
+          /* Read on the client so /login stays a prerendered route — a page the
+             server has to build per-request can't be prefetched, which is what
+             made the nav button feel dead until the server answered. */
+          <Suspense fallback={null}>
+            <CallbackError />
+          </Suspense>
+        )}
         {!authEnabled ? (
           <input type="hidden" name="demo" value="1" />
         ) : null}
-        <Pill type="submit" className="mt-4 w-full" disabled={pending}>
-          {pending ? "Working…" : action}
+        <Pill type="submit" size="lg" className="mt-5 w-full" loading={pending}>
+          {action}
         </Pill>
       </form>
       {!authEnabled ? (
@@ -97,28 +102,16 @@ export function AuthCard({
         </p>
       ) : null}
       <p className="mt-8 text-[14px] text-muted">{footer}</p>
-    </Shell>
+    </AuthShell>
   );
 }
 
-function Shell({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="relative min-h-screen overflow-hidden bg-canvas">
-      <Orb className="-right-20 top-10 h-[380px] w-[380px]" />
-      <div className="relative mx-auto flex min-h-screen max-w-[440px] flex-col justify-center px-6 py-16">
-        <Wordmark />
-        <h1 className="display mt-14 text-[clamp(36px,6vw,48px)]">{title}</h1>
-        <p className="mt-4 text-body">{subtitle}</p>
-        {children}
-      </div>
-    </div>
-  );
+function ErrorLine({ children }: { children: React.ReactNode }) {
+  return <p className="text-[13px] text-brand">{children}</p>;
+}
+
+/** Supabase's callback and confirm routes bounce failures back as ?error=. */
+function CallbackError() {
+  const error = useSearchParams().get("error");
+  return error ? <ErrorLine>{error}</ErrorLine> : null;
 }

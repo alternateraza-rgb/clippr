@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_HINT_COOKIE } from "@/lib/supabase/session-hint";
 
 function copyCookies(from: NextResponse, to: NextResponse) {
   from.cookies.getAll().forEach((cookie) => to.cookies.set(cookie));
@@ -38,24 +39,38 @@ export async function updateSession(request: NextRequest) {
   const isAuth = path === "/login" || path === "/signup";
   const isOnboarding = path.startsWith("/onboarding");
 
+  // Only written when it actually changes, so the vast majority of responses
+  // carry no Set-Cookie of ours and stay as cacheable as they were.
+  const hinted = request.cookies.get(SESSION_HINT_COOKIE)?.value === "1";
+  const setHint = (target: NextResponse) => {
+    if (user && !hinted) {
+      target.cookies.set(SESSION_HINT_COOKIE, "1", {
+        httpOnly: false,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      });
+    } else if (!user && hinted) {
+      target.cookies.set(SESSION_HINT_COOKIE, "", { path: "/", maxAge: 0 });
+    }
+    return target;
+  };
+
   const bounce = (pathname: string) => {
     const redirect = request.nextUrl.clone();
     redirect.pathname = pathname;
     redirect.search = "";
-    return copyCookies(response, NextResponse.redirect(redirect));
+    return setHint(copyCookies(response, NextResponse.redirect(redirect)));
   };
 
   if ((isApp || isOnboarding) && !user) {
     return bounce("/login");
   }
 
+  // No profile lookup here: /app runs the same check on the very next hop, and
+  // doing it twice put two round trips between the click and the dashboard.
   if (user && isAuth) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("onboarding_complete")
-      .eq("id", user.id)
-      .maybeSingle();
-    return bounce(profile?.onboarding_complete === false ? "/onboarding" : "/app");
+    return bounce("/app");
   }
 
   if (user && isApp) {
@@ -69,5 +84,5 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  return response;
+  return setHint(response);
 }
