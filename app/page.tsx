@@ -5,7 +5,6 @@ import { LandingFAQ } from "@/components/landing/LandingFAQ";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { LandingIdeas } from "@/components/landing/LandingIdeas";
 import { LandingNav } from "@/components/landing/LandingNav";
-import { LandingReviews } from "@/components/landing/LandingReviews";
 import { WhatYouGet } from "@/components/landing/WhatYouGet";
 
 export default function LandingPage() {
@@ -17,7 +16,6 @@ export default function LandingPage() {
       <WhatYouGet />
       <HowYouGetPaid />
       <LandingIdeas />
-      <LandingReviews />
       <LandingFAQ />
       <LandingFooter />
     </div>
