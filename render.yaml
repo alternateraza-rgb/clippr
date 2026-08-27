@@ -23,3 +23,14 @@ services:
       # gets 403'd by YouTube.
       - key: YTDLP_PROXY
         sync: false
+      # Cloudflare R2, where finished clips are written. All four or none —
+      # with any missing the worker silently writes to Supabase Storage
+      # instead, which is where the egress bill came from.
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false

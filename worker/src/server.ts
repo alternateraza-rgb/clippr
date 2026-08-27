@@ -3,7 +3,7 @@ import "../../lib/load-env";
 import { mkdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { env, hasApify, hasLlm, hasServiceRole, hasSupadata, workerSecret, ytdlpProxy } from "../../lib/config";
+import { env, hasApify, hasLlm, hasR2, hasServiceRole, hasSupadata, workerSecret, ytdlpProxy } from "../../lib/config";
 import { upsertTranscribeJob } from "../../lib/supabase/jobs";
 import { drainQueued, processRender } from "./render";
 import { processTranscribe } from "./transcribe";
@@ -235,6 +235,10 @@ server.listen(PORT, HOST, () => {
   console.info(
     `[worker] secret=${secret ? "set" : "MISSING"} supabase=${hasServiceRole() ? "set" : "MISSING"} llm=${hasLlm() ? "set" : "MISSING"} supadata=${hasSupadata() ? "set" : "no"} apify=${hasApify() ? "set" : "no"}`,
   );
+  // Which store finished clips land in. Silent fallback to Supabase is the
+  // failure this makes visible: R2 needs all four variables, and missing one
+  // looks exactly like never having configured it.
+  console.info(`[worker] clips=${hasR2() ? "r2" : "supabase"}`);
   run("ffmpeg", ["-version"])
     .then(() => {
       ffmpegReady = true;
