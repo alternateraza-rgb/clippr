@@ -41,7 +41,8 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function SettingsPage() {
   const { profile, setProfile } = useProfile();
-  const { renders } = useRenders();
+  // Counts and durations only — no signed download links needed here.
+  const { renders } = useRenders({ withUrls: false });
   const [account, setAccount] = useState<Account | null>(null);
   const [authEnabled, setAuthEnabled] = useState(false);
   const [billing, setBilling] = useState<Billing | null>(null);

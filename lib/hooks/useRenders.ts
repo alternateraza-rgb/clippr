@@ -3,7 +3,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ClipRender } from "@/lib/agent/types";
 
-export function useRenders() {
+/** Statuses that are still going somewhere. Anything else has settled. */
+const IN_FLIGHT: ClipRender["status"][] = [
+  "queued",
+  "downloading",
+  "transcribing",
+  "scoring",
+  "rendering",
+];
+
+const POLL_MS = 4000;
+
+export function useRenders(options?: { withUrls?: boolean }) {
+  const withUrls = options?.withUrls !== false;
   const [renders, setRenders] = useState<ClipRender[]>([]);
   const [loading, setLoading] = useState(true);
   /**
@@ -15,25 +27,34 @@ export function useRenders() {
 
   useEffect(() => {
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
     const tick = () => {
-      fetch("/api/studio/renders")
+      fetch(withUrls ? "/api/studio/renders" : "/api/studio/renders?meta=1")
         .then((r) => r.json())
         .then((data: { renders?: ClipRender[] }) => {
           if (cancelled) return;
-          setRenders((data.renders ?? []).filter((r) => !dropped.current.has(r.id)));
+          const next = (data.renders ?? []).filter((r) => !dropped.current.has(r.id));
+          setRenders(next);
+          // Keep watching only while something is actually being made. A
+          // library of finished clips was re-fetching itself every four
+          // seconds for as long as the tab stayed open.
+          if (next.some((r) => IN_FLIGHT.includes(r.status))) {
+            timer = setTimeout(tick, POLL_MS);
+          }
         })
         .catch(() => null)
         .finally(() => {
           if (!cancelled) setLoading(false);
         });
     };
+
     tick();
-    const timer = setInterval(tick, 4000);
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      if (timer) clearTimeout(timer);
     };
-  }, []);
+  }, [withUrls]);
 
   const remove = useCallback((id: string) => {
     dropped.current.add(id);

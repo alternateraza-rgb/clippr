@@ -436,6 +436,8 @@ export async function deleteClipRender(userId: string, id: string): Promise<bool
   // .select() so the count is the answer. A delete filtered out by RLS returns
   // no error and zero rows, so trusting `!error` reported success while nothing
   // was removed — the card animated away and came back on the next poll.
+  if (path) forgetSignedClipUrl(path);
+
   const { data: removed, error } = await supabase
     .from("clip_renders")
     .delete()
@@ -445,9 +447,46 @@ export async function deleteClipRender(userId: string, id: string): Promise<bool
   return !error && (removed?.length ?? 0) > 0;
 }
 
+const SIGNED_URL_TTL_S = 3600;
+/** Re-sign well before expiry, so a URL handed out now still works when used. */
+const SIGNED_URL_REUSE_MS = (SIGNED_URL_TTL_S - 600) * 1000;
+const SIGNED_URL_CACHE_MAX = 500;
+
+const signedUrls = new Map<string, { url: string; until: number }>();
+
+/** Dropped when a clip is deleted, so a stale link cannot outlive its file. */
+export function forgetSignedClipUrl(path: string) {
+  signedUrls.delete(path);
+  signedUrls.delete(path.replace(/\.mp4$/, ".jpg"));
+}
+
+/**
+ * A signed link to a clip, reused until it is close to expiring.
+ *
+ * createSignedUrl mints a fresh token on every call, and the library polls.
+ * A new token means a new URL string, which means a new `src` on every <video>
+ * in the grid, which means the browser throws away what it had and refetches —
+ * so a library sitting open was pulling every clip again every few seconds.
+ * The token is good for an hour; there is no reason to make a new one.
+ */
 export async function signedClipUrl(path: string): Promise<string | null> {
+  const hit = signedUrls.get(path);
+  if (hit && hit.until > Date.now()) return hit.url;
+
   const supabase = createAdminClient() ?? (await createClient());
   if (!supabase) return null;
-  const { data } = await supabase.storage.from("clips").createSignedUrl(path, 3600);
-  return data?.signedUrl ?? null;
+  const { data } = await supabase.storage
+    .from("clips")
+    .createSignedUrl(path, SIGNED_URL_TTL_S);
+
+  const url = data?.signedUrl ?? null;
+  if (url) {
+    // Bounded: this is a cache, not a record of every clip ever signed.
+    if (signedUrls.size >= SIGNED_URL_CACHE_MAX) {
+      const oldest = signedUrls.keys().next().value;
+      if (oldest) signedUrls.delete(oldest);
+    }
+    signedUrls.set(path, { url, until: Date.now() + SIGNED_URL_REUSE_MS });
+  }
+  return url;
 }
