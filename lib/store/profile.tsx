@@ -50,6 +50,8 @@ type ProfileContextValue = {
   profile: Profile;
   hydrated: boolean;
   setProfile: (next: Profile | ((prev: Profile) => Profile)) => Promise<void>;
+  /** Accepts server state without writing it back. */
+  hydrate: (next: Profile) => void;
   reset: () => Promise<void>;
 };
 
@@ -77,6 +79,16 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const hydrate = useCallback((next: Profile) => {
+    memory = next;
+    try {
+      localStorage.setItem(KEY, JSON.stringify(memory));
+    } catch {
+      // ignore quota
+    }
+    emit();
+  }, []);
+
   const reset = useCallback(() => setProfile(DEFAULT_PROFILE), [setProfile]);
 
   const value = useMemo<ProfileContextValue>(
@@ -84,9 +96,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       profile,
       hydrated: true,
       setProfile,
+      hydrate,
       reset,
     }),
-    [profile, setProfile, reset],
+    [profile, setProfile, hydrate, reset],
   );
 
   return (
