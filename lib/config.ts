@@ -64,6 +64,33 @@ export function billingEnforced() {
   return hasWhop() && env("BILLING_ENFORCED").toLowerCase() !== "false";
 }
 
+/**
+ * Cloudflare R2, for finished clips. S3-compatible with no egress charge,
+ * which is the entire reason to move video off Supabase Storage: delivering a
+ * clip is pure egress and every download was billed.
+ *
+ * Optional. With no keys the app reads and writes Supabase exactly as before.
+ */
+export function r2AccountId() {
+  return env("R2_ACCOUNT_ID");
+}
+
+export function r2AccessKeyId() {
+  return env("R2_ACCESS_KEY_ID");
+}
+
+export function r2SecretAccessKey() {
+  return env("R2_SECRET_ACCESS_KEY");
+}
+
+export function r2Bucket() {
+  return env("R2_BUCKET");
+}
+
+export function hasR2() {
+  return Boolean(r2AccountId() && r2AccessKeyId() && r2SecretAccessKey() && r2Bucket());
+}
+
 export function llmKey() {
   return env("LLM_API_KEY") || env("OPENAI_API_KEY");
 }

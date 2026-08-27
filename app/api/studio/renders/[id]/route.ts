@@ -19,7 +19,7 @@ export async function GET(
   }
   let downloadUrl: string | null = null;
   if (render.status === "ready" && render.outputPath) {
-    downloadUrl = await signedClipUrl(render.outputPath);
+    downloadUrl = await signedClipUrl(render.outputPath, render.storage);
   }
   return Response.json({ render: { ...render, downloadUrl } });
 }

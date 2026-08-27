@@ -1,5 +1,6 @@
 import { RUBRIC_VERSION, hasLlm } from "@/lib/config";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { deleteR2Objects, presignR2Url, type StorageProvider } from "@/lib/storage/r2";
 import { createClient } from "@/lib/supabase/server";
 import type {
   AnalysisResult,
@@ -354,6 +355,7 @@ function asRender(row: {
   created_at: string;
   finished_at?: string | null;
   moment?: ClipCandidate | null;
+  storage?: string | null;
 }): ClipRender {
   return {
     id: row.id,
@@ -374,6 +376,7 @@ function asRender(row: {
     topic: row.moment?.topic,
     why: row.moment?.whyItClips,
     segmentCount: row.moment?.segments?.length,
+    storage: (row.storage as StorageProvider) ?? "supabase",
   };
 }
 
@@ -415,19 +418,25 @@ export async function deleteClipRender(userId: string, id: string): Promise<bool
 
   const { data } = await supabase
     .from("clip_renders")
-    .select("output_path")
+    .select("output_path, storage")
     .eq("user_id", userId)
     .eq("id", id)
     .maybeSingle();
   if (!data) return false;
 
-  const path = (data as { output_path?: string | null }).output_path;
+  const row = data as { output_path?: string | null; storage?: string | null };
+  const path = row.output_path;
   if (path) {
+    // The poster is written beside the mp4 under the same key.
+    const keys = [path, path.replace(/\.mp4$/, ".jpg")];
     try {
-      // The poster is written beside the mp4 under the same key. Storage
-      // failures must not block the row delete, or a clip whose file already
-      // went missing could never be cleared from the library.
-      await supabase.storage.from("clips").remove([path, path.replace(/\.mp4$/, ".jpg")]);
+      // Storage failures must not block the row delete, or a clip whose file
+      // already went missing could never be cleared from the library.
+      if (row.storage === "r2") {
+        await deleteR2Objects(keys);
+      } else {
+        await supabase.storage.from("clips").remove(keys);
+      }
     } catch {
       // Falls through to the row delete.
     }
@@ -456,8 +465,10 @@ const signedUrls = new Map<string, { url: string; until: number }>();
 
 /** Dropped when a clip is deleted, so a stale link cannot outlive its file. */
 export function forgetSignedClipUrl(path: string) {
-  signedUrls.delete(path);
-  signedUrls.delete(path.replace(/\.mp4$/, ".jpg"));
+  for (const provider of ["supabase", "r2"]) {
+    signedUrls.delete(`${provider}:${path}`);
+    signedUrls.delete(`${provider}:${path.replace(/\.mp4$/, ".jpg")}`);
+  }
 }
 
 /**
@@ -469,24 +480,33 @@ export function forgetSignedClipUrl(path: string) {
  * so a library sitting open was pulling every clip again every few seconds.
  * The token is good for an hour; there is no reason to make a new one.
  */
-export async function signedClipUrl(path: string): Promise<string | null> {
-  const hit = signedUrls.get(path);
+export async function signedClipUrl(
+  path: string,
+  provider: StorageProvider = "supabase",
+): Promise<string | null> {
+  const cacheKey = `${provider}:${path}`;
+  const hit = signedUrls.get(cacheKey);
   if (hit && hit.until > Date.now()) return hit.url;
 
-  const supabase = createAdminClient() ?? (await createClient());
-  if (!supabase) return null;
-  const { data } = await supabase.storage
-    .from("clips")
-    .createSignedUrl(path, SIGNED_URL_TTL_S);
+  let url: string | null = null;
+  if (provider === "r2") {
+    url = await presignR2Url(path, SIGNED_URL_TTL_S);
+  } else {
+    const supabase = createAdminClient() ?? (await createClient());
+    if (!supabase) return null;
+    const { data } = await supabase.storage
+      .from("clips")
+      .createSignedUrl(path, SIGNED_URL_TTL_S);
+    url = data?.signedUrl ?? null;
+  }
 
-  const url = data?.signedUrl ?? null;
   if (url) {
     // Bounded: this is a cache, not a record of every clip ever signed.
     if (signedUrls.size >= SIGNED_URL_CACHE_MAX) {
       const oldest = signedUrls.keys().next().value;
       if (oldest) signedUrls.delete(oldest);
     }
-    signedUrls.set(path, { url, until: Date.now() + SIGNED_URL_REUSE_MS });
+    signedUrls.set(cacheKey, { url, until: Date.now() + SIGNED_URL_REUSE_MS });
   }
   return url;
 }

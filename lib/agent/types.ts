@@ -145,6 +145,8 @@ export type ClipRender = {
   topic?: string;
   why?: string;
   segmentCount?: number;
+  /** Which store holds the file. Older rows predate R2 and say "supabase". */
+  storage?: "supabase" | "r2";
 };
 
 export type Profile = {

@@ -3,6 +3,8 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAdminClient } from "../../lib/supabase/admin";
+import { hasR2 } from "../../lib/config";
+import { putR2Object } from "../../lib/storage/r2";
 import { captionLinesForRange } from "../../lib/agent/compose";
 import { jumpCutDuration, planJumpCuts, remapCaptionLines, type Interval } from "../../lib/agent/jumpcuts";
 import { snapToSentences } from "../../lib/agent/boundaries";
@@ -41,6 +43,7 @@ async function setStatus(
     progress?: number;
     error?: string | null;
     asr_source?: string;
+    storage?: "supabase" | "r2";
     output_path?: string;
     output_bytes?: number;
     duration_s?: number;
@@ -395,11 +398,26 @@ export async function processRender(renderId: string) {
     const bytes = await readFile(out);
     const info = await stat(out);
     const outputPath = `${row.user_id}/${renderId}.mp4`;
-    const upload = await admin.storage.from("clips").upload(outputPath, bytes, {
-      contentType: "video/mp4",
-      upsert: true,
-    });
-    if (upload.error) throw new Error(upload.error.message);
+    const posterPath = `${row.user_id}/${renderId}.jpg`;
+
+    // R2 when it is configured, Supabase otherwise. The choice is recorded on
+    // the row so reads never have to probe both, and clips written before the
+    // move keep resolving against the store that actually holds them.
+    const storage = hasR2() ? "r2" : "supabase";
+
+    const putClip = async (key: string, body: Buffer, contentType: string) => {
+      if (storage === "r2") {
+        await putR2Object(key, body, contentType);
+        return;
+      }
+      const upload = await admin.storage.from("clips").upload(key, body, {
+        contentType,
+        upsert: true,
+      });
+      if (upload.error) throw new Error(upload.error.message);
+    };
+
+    await putClip(outputPath, bytes, "video/mp4");
 
     // A poster beside the video, keyed off the same name so the API can sign it
     // without a schema change. A grid of <video> elements with no poster has to
@@ -409,10 +427,7 @@ export async function processRender(renderId: string) {
       await run("ffmpeg", ["-y", "-ss", "1", "-i", out, "-frames:v", "1", "-q:v", "4", poster], {
         timeoutMs: 60_000,
       });
-      await admin.storage.from("clips").upload(`${row.user_id}/${renderId}.jpg`, await readFile(poster), {
-        contentType: "image/jpeg",
-        upsert: true,
-      });
+      await putClip(posterPath, await readFile(poster), "image/jpeg");
     } catch (posterErr) {
       // Cosmetic. The card falls back to a video frame.
       console.warn("[render] no poster frame", posterErr instanceof Error ? posterErr.message : posterErr);
@@ -422,6 +437,7 @@ export async function processRender(renderId: string) {
       status: "ready",
       progress: 100,
       output_path: outputPath,
+      storage,
       output_bytes: info.size,
       duration_s: finalDuration,
       finished_at: new Date().toISOString(),

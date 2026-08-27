@@ -18,6 +18,8 @@
     "whop:testcode": "tsx scripts/whop-testcode.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1119.0",
+    "@aws-sdk/s3-request-presigner": "^3.1119.0",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.3",
     "@whop/sdk": "^1.0.14",
