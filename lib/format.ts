@@ -32,10 +32,11 @@ export function formatRelativeDate(iso: string) {
 
 export function greetingForNow(name: string) {
   const hour = new Date().getHours();
-  const first = name.split(" ")[0] ?? name;
-  if (hour < 12) return `Good morning, ${first}.`;
-  if (hour < 18) return `Good afternoon, ${first}.`;
-  return `Good evening, ${first}.`;
+  const time = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  // No name yet — before the profile loads, or for an account that never set
+  // one. "Good afternoon, ." is worse than no name at all.
+  const first = name.trim().split(" ")[0];
+  return first ? `${time}, ${first}.` : `${time}.`;
 }
 
 export function weightedScore(scores: {

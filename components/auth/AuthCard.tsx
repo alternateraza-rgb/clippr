@@ -24,7 +24,7 @@ export function AuthCard({
   footer: React.ReactNode;
 }) {
   const { profile, setProfile } = useProfile();
-  const [name, setName] = useState(profile.displayName);
+  const [name, setName] = useState("");
   const authEnabled = hasSupabase();
   const [state, formAction, pending] = useActionState(
     showName ? signup : login,
