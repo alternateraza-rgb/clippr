@@ -7,10 +7,12 @@ import { LandingIdeas } from "@/components/landing/LandingIdeas";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingReviews } from "@/components/landing/LandingReviews";
 import { WhatYouGet } from "@/components/landing/WhatYouGet";
+import { SmoothScroll } from "@/components/motion/SmoothScroll";
 
 export default function LandingPage() {
   return (
     <div className="bg-canvas">
+      <SmoothScroll />
       <LandingNav />
       <Hero />
       <HowItWorks />

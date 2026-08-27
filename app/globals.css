@@ -8,6 +8,11 @@
    the display line is the only voice raised in the room. Decoration is spent
    on two things only — the accent and real product surfaces (a clip, a
    waveform, a frame) — never on gradients standing in for content.
+
+   Surfaces are drawn, not floated. A card is a hairline and a radius; hover
+   darkens that hairline and moves nothing. Shadow is reserved for the handful
+   of things that genuinely sit above the page — a sheet, a dialog, a lightbox,
+   the nav once you've scrolled under it.
 --------------------------------------------------------------------------- */
 
 @theme inline {
@@ -45,11 +50,127 @@
   --font-caption: var(--font-anton), Anton, Impact, "Arial Black", sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
 
-  /* Elevation is mostly a hairline. Shadow only where something genuinely
-     floats above the page — a menu, a sheet, a dragged thing. */
-  --shadow-hairline: 0 0 0 1px rgb(0 0 0 / 0.07);
+  /* -------------------------------------------------------------------------
+     Type scale
+
+     Six body steps, six display steps, and every call site picks one of them.
+     The sizes matter less than what travels with them: tracking tightens as
+     the size climbs and the leading closes up, so a heading is never just body
+     copy set large. Nothing outside this block is allowed to name a font
+     size — the one exception, `--text-burn`, is not UI type at all.
+  ------------------------------------------------------------------------- */
+
+  /* Badges, timestamps, the eyebrow. Small type opens up rather than closing. */
+  --text-micro: 11px;
+  --text-micro--line-height: 1.45;
+  --text-micro--letter-spacing: 0.01em;
+
+  /* Meta lines under a card — channel, date, duration. */
+  --text-caption: 12px;
+  --text-caption--line-height: 1.5;
+  --text-caption--letter-spacing: 0.005em;
+
+  /* Secondary copy and small controls. */
+  --text-sm: 13px;
+  --text-sm--line-height: 1.55;
+  --text-sm--letter-spacing: 0em;
+
+  /* The workhorse: default UI text, nav, buttons. */
+  --text-base: 14px;
+  --text-base--line-height: 1.6;
+  --text-base--letter-spacing: -0.005em;
+
+  /* Body copy you actually read a paragraph of. */
+  --text-md: 15px;
+  --text-md--line-height: 1.62;
+  --text-md--letter-spacing: -0.008em;
+
+  /* A lede, or a sentence carrying a whole section. */
+  --text-lg: 17px;
+  --text-lg--line-height: 1.6;
+  --text-lg--letter-spacing: -0.011em;
+
+  /* Display steps. Pair with `.display`, which supplies the face and weight
+     but deliberately not the tracking — that belongs to the size. */
+  --text-d1: 20px;
+  --text-d1--line-height: 1.3;
+  --text-d1--letter-spacing: -0.02em;
+
+  --text-d2: 24px;
+  --text-d2--line-height: 1.22;
+  --text-d2--letter-spacing: -0.025em;
+
+  --text-d3: 30px;
+  --text-d3--line-height: 1.15;
+  --text-d3--letter-spacing: -0.03em;
+
+  /* The three fluid steps cover three jobs, and there are only three. Ten
+     different clamps for what were really page titles, section heads and one
+     hero is most of why separate screens didn't look related. */
+
+  /* Page title: every workspace page, auth, legal, checkout, onboarding. */
+  --text-d4: clamp(28px, 3.6vw, 40px);
+  --text-d4--line-height: 1.08;
+  --text-d4--letter-spacing: -0.032em;
+
+  /* Section head: the marketing bands, and the price on a dark panel. */
+  --text-d5: clamp(30px, 4.6vw, 52px);
+  --text-d5--line-height: 1.02;
+  --text-d5--letter-spacing: -0.038em;
+
+  /* The hero, and nothing else. At this size the letters have to close right
+     up or the line reads as a default h1 scaled. */
+  --text-d6: clamp(40px, 7.4vw, 80px);
+  --text-d6--line-height: 0.95;
+  --text-d6--letter-spacing: -0.045em;
+
+  /* Burnt-in caption type. Not part of the UI scale — this is the face that
+     gets rendered into the video itself, so it answers to the clip, not to
+     the page, and it's set in `--font-caption`. */
+  --text-burn: 26px;
+  --text-burn--line-height: 1;
+  --text-burn--letter-spacing: 0.01em;
+
+  /* -------------------------------------------------------------------------
+     Rhythm
+
+     Named gaps, so the vertical spacing between sections is a decision made
+     once rather than re-guessed per page. `mt-7 / mt-10 / mt-12 / mt-14` on
+     four pages is four different rhythms.
+  ------------------------------------------------------------------------- */
+  --spacing-tight: 1rem;
+  --spacing-block: 2rem;
+  --spacing-section: 3rem;
+  --spacing-band: 5rem;
+  --spacing-band-lg: 7rem;
+
+  /* -------------------------------------------------------------------------
+     Radii
+
+     Concentric: something nested inside a rounded container needs a smaller
+     radius than the container, or the corners read as two unrelated curves.
+  ------------------------------------------------------------------------- */
+  --radius-pill: 9999px;
+  --radius-control: 10px;
+  --radius-control-inner: 6px;
+  --radius-card: 14px;
+  --radius-card-inner: 10px;
+  --radius-panel: 20px;
+  --radius-panel-inner: 14px;
+
+  /* -------------------------------------------------------------------------
+     Elevation
+
+     `hairline` is the same grey as `--color-hairline`, so a ring and a border
+     are never two different greys sitting next to each other. `lift` and `pop`
+     are for things that actually float; a card at rest uses neither.
+  ------------------------------------------------------------------------- */
+  --shadow-hairline: 0 0 0 1px var(--color-hairline);
+  /* What a card does on hover. The line darkens and nothing else happens —
+     no bloom, no lift. A shadow that grows under the cursor is the tell. */
+  --shadow-hairline-strong: 0 0 0 1px var(--color-hairline-strong);
   --shadow-lift:
-    0 0 0 1px rgb(0 0 0 / 0.07),
+    0 0 0 1px var(--color-hairline),
     0 6px 20px rgb(0 0 0 / 0.06);
   --shadow-pop:
     0 0 0 1px rgb(0 0 0 / 0.08),
@@ -60,11 +181,6 @@
 }
 
 :root {
-  --radius-pill: 9999px;
-  --radius-control: 10px;
-  --radius-card: 14px;
-  --radius-panel: 20px;
-
   --dur-fast: 130ms;
   --dur-base: 220ms;
   --dur-slow: 480ms;
@@ -84,10 +200,13 @@ body {
   background: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* Inter is variable — let the face adjust its own contrast with the size
+     instead of scaling one master outline. */
+  font-optical-sizing: auto;
 }
 
 ::selection {
@@ -108,26 +227,29 @@ body {
   outline: none;
 }
 
+/* A heading that breaks one word onto its own last line is the most visible
+   typesetting mistake there is, and the browser will fix it for free. */
+h1,
+h2,
+h3,
+.display {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
 @layer components {
-  /* The house voice. Tight, mid-weight, optically flush — the tracking has to
-     come off as the size goes up or it reads as a default h1. */
+  /* The house voice. Face and weight only — the tracking and leading arrive
+     with the size step, so `.display text-d3` is the whole decision. */
   .display {
     font-family: var(--font-display);
     font-weight: 500;
-    letter-spacing: -0.035em;
-    line-height: 1;
-  }
-
-  /* Above ~44px the letters need to close up further still. */
-  .display-xl {
-    font-family: var(--font-display);
-    font-weight: 500;
-    letter-spacing: -0.045em;
-    line-height: 0.95;
   }
 
   .eyebrow {
-    font-size: 11px;
+    font-size: var(--text-micro);
     font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -162,53 +284,9 @@ body {
   background: var(--color-canvas);
 }
 
-@layer components {
-  .workspace .display {
-    letter-spacing: -0.03em;
-  }
-}
-
-/* Marquee rails used on the landing page for logo/proof strips. */
-@keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-
 @keyframes sweep {
   100% {
     transform: translateX(100%);
-  }
-}
-
-/* The caption chip pop used in clip previews and the studio stage. */
-@keyframes pop-in {
-  0% {
-    transform: scale(0.82);
-    opacity: 0;
-  }
-  60% {
-    transform: scale(1.04);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-/* A slow drift for the accent glow behind product shots. Deliberately the only
-   ambient animation in the system. */
-@keyframes drift {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(2%, -3%, 0) scale(1.06);
   }
 }
 

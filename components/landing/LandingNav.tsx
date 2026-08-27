@@ -14,7 +14,7 @@ export function LandingNav() {
     <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/85 backdrop-blur-md">
       <div className="mx-auto flex h-[62px] max-w-[1120px] items-center justify-between gap-6 px-6">
         <Wordmark size={20} />
-        <nav className="hidden items-center gap-7 text-[14px] text-body md:flex">
+        <nav className="hidden items-center gap-7 text-base text-body md:flex">
           {LINKS.map((link) => (
             <Link
               key={link.href}

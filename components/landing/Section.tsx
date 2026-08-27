@@ -26,7 +26,7 @@ export function SectionHead({
       <p className="eyebrow text-brand">{eyebrow}</p>
       <h2
         className={cn(
-          "display mt-4 text-[clamp(30px,4.6vw,52px)] text-ink",
+          "display mt-4 text-d5 text-ink",
           align === "left" && "max-w-[18ch]",
         )}
       >
@@ -35,7 +35,7 @@ export function SectionHead({
       {lede ? (
         <p
           className={cn(
-            "mt-5 text-[16.5px] leading-relaxed text-body",
+            "mt-5 text-lg text-body",
             align === "center" ? "mx-auto max-w-[52ch]" : "max-w-[52ch]",
           )}
         >

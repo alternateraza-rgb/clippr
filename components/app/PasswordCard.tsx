@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { Check } from "lucide-react";
 import { changePassword, sendPasswordReset, type PasswordState } from "@/app/auth/password";
 import { Pill } from "@/components/ui/Pill";
+import { TextInput } from "@/components/ui/TextInput";
 
 const INITIAL: PasswordState = {};
 
@@ -26,8 +27,8 @@ export function PasswordCard({ email }: { email: string }) {
     return (
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[12.5px] text-muted">Password</p>
-          <p className="mt-0.5 text-[15px] text-ink">••••••••••</p>
+          <p className="text-caption text-muted">Password</p>
+          <p className="mt-0.5 text-md text-ink">••••••••••</p>
         </div>
         <Pill variant="outline" size="sm" onClick={() => setOpen(true)}>
           Change password
@@ -39,7 +40,7 @@ export function PasswordCard({ email }: { email: string }) {
   return (
     <div>
       {state.done ? (
-        <p className="flex items-center gap-2 rounded-[var(--radius-control)] bg-success-soft px-4 py-3 text-[14px] text-success">
+        <p className="flex items-center gap-2 rounded-control bg-success-soft px-4 py-3 text-base text-success">
           <Check className="h-4 w-4" strokeWidth={2.4} />
           {state.done}
         </p>
@@ -48,26 +49,24 @@ export function PasswordCard({ email }: { email: string }) {
           {/* Present for password managers: they need to know which login this
               new password belongs to. */}
           <input type="hidden" name="email" value={email} autoComplete="username" />
-          <input
+          <TextInput
             type="password"
             name="password"
             required
             minLength={8}
             autoComplete="new-password"
             placeholder="New password"
-            className="w-full rounded-[var(--radius-control)] bg-surface px-4 py-3 text-[15px] text-ink outline-none shadow-[inset_0_0_0_1px_var(--color-hairline)] transition-shadow placeholder:text-muted focus:shadow-[inset_0_0_0_1.5px_var(--color-ink)]"
           />
-          <input
+          <TextInput
             type="password"
             name="confirm"
             required
             minLength={8}
             autoComplete="new-password"
             placeholder="Confirm new password"
-            className="w-full rounded-[var(--radius-control)] bg-surface px-4 py-3 text-[15px] text-ink outline-none shadow-[inset_0_0_0_1px_var(--color-hairline)] transition-shadow placeholder:text-muted focus:shadow-[inset_0_0_0_1.5px_var(--color-ink)]"
           />
 
-          {state.error ? <p className="text-[13.5px] text-brand">{state.error}</p> : null}
+          {state.error ? <p className="text-sm text-brand">{state.error}</p> : null}
 
           <div className="flex flex-wrap items-center gap-2.5 pt-1">
             <Pill type="submit" size="sm" loading={pending}>
@@ -82,19 +81,19 @@ export function PasswordCard({ email }: { email: string }) {
 
       <div className="mt-5 border-t border-hairline pt-4">
         {reset.done ? (
-          <p className="text-[13.5px] text-success">{reset.done}</p>
+          <p className="text-sm text-success">{reset.done}</p>
         ) : (
           <>
             <button
               type="button"
               onClick={mailReset}
               disabled={sending}
-              className="text-[13.5px] text-body underline-offset-4 transition-colors hover:text-ink hover:underline disabled:opacity-50"
+              className="text-sm text-body underline-offset-4 transition-colors hover:text-ink hover:underline disabled:opacity-50"
             >
               {sending ? "Sending…" : "Email me a reset link instead"}
             </button>
             {reset.error ? (
-              <p className="mt-2 text-[13.5px] text-brand">{reset.error}</p>
+              <p className="mt-2 text-sm text-brand">{reset.error}</p>
             ) : null}
           </>
         )}

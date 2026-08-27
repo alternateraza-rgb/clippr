@@ -47,14 +47,14 @@ export function LandingFAQ() {
           <div className="divide-y divide-hairline border-y border-hairline">
             {FAQS.map((faq) => (
               <details key={faq.q} className="group">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-[17px] font-medium text-ink marker:hidden [&::-webkit-details-marker]:hidden">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-lg font-medium text-ink marker:hidden [&::-webkit-details-marker]:hidden">
                   {faq.q}
                   <Plus
                     className="h-4 w-4 shrink-0 text-muted transition-transform duration-[var(--dur-base)] ease-[var(--ease-out-soft)] group-open:rotate-45"
                     strokeWidth={2}
                   />
                 </summary>
-                <p className="max-w-[56ch] pb-6 text-[15px] leading-relaxed text-body">
+                <p className="max-w-[56ch] pb-6 text-md text-body">
                   {faq.a}
                 </p>
               </details>

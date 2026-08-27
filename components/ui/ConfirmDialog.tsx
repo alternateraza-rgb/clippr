@@ -75,7 +75,7 @@ export function ConfirmDialog({
             role="alertdialog"
             aria-modal="true"
             aria-label={title}
-            className="relative w-full max-w-[400px] rounded-[var(--radius-panel)] bg-canvas p-6 shadow-pop outline-none"
+            className="relative w-full max-w-[400px] rounded-panel bg-canvas p-6 shadow-pop outline-none"
             initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.97, y: 8 }}
@@ -85,10 +85,10 @@ export function ConfirmDialog({
                 : { type: "spring", stiffness: 420, damping: 34, mass: 0.8 }
             }
           >
-            <h2 className="display text-[20px] text-ink">{title}</h2>
-            <div className="mt-2.5 text-[14.5px] leading-relaxed text-body">{body}</div>
+            <h2 className="display text-d1 text-ink">{title}</h2>
+            <div className="mt-2.5 text-base text-body">{body}</div>
 
-            {error ? <p className="mt-3 text-[13.5px] text-brand">{error}</p> : null}
+            {error ? <p className="mt-3 text-sm text-brand">{error}</p> : null}
 
             <div className="mt-6 flex items-center justify-end gap-2.5">
               <Pill variant="ghost" onClick={onCancel} disabled={working}>

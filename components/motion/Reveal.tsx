@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { usePrefersReducedMotion } from "@/components/motion/usePrefersReducedMotion";
+import { fast, slow } from "@/components/motion/presets";
 
 /** One entrance for the whole marketing site: up a little, in once. */
 export function Reveal({
@@ -23,7 +24,7 @@ export function Reveal({
       initial={reduced ? { opacity: 0 } : { opacity: 0, y }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.15 }}
-      transition={{ duration: reduced ? 0.2 : 0.55, delay, ease: [0.2, 0.8, 0.2, 1] }}
+      transition={reduced ? { ...fast, delay } : { ...slow, delay }}
     >
       {children}
     </motion.div>

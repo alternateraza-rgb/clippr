@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { usePrefersReducedMotion } from "@/components/motion/usePrefersReducedMotion";
+import { EASE } from "@/components/motion/presets";
 import { thumbnailFor } from "@/lib/youtube";
 import { cn } from "@/lib/cn";
 
@@ -120,13 +121,13 @@ export function RenderStage({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-[var(--radius-panel)] bg-void text-white",
+        "overflow-hidden rounded-panel bg-void text-white",
         className,
       )}
     >
       <div className="flex items-center justify-between gap-4 px-6 pt-6">
         <p className="eyebrow text-brand">{eyebrow}</p>
-        <p className="tnum text-[12.5px] text-white/45">
+        <p className="tnum text-caption text-white/45">
           {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}
         </p>
       </div>
@@ -214,7 +215,7 @@ export function RenderStage({
                 {CAPTION_BEATS.map((line, i) => (
                   <motion.span
                     key={line}
-                    className="font-caption rounded-[6px] bg-black px-2 py-0.5 text-[13px] uppercase leading-tight tracking-[-0.03em] text-white"
+                    className="font-caption rounded-[6px] bg-black px-2 py-0.5 text-sm uppercase leading-tight tracking-[-0.03em] text-white"
                     initial={reduced ? { opacity: 1 } : { opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: reduced ? 0 : 0.25 + i * 0.22, type: "spring", stiffness: 420, damping: 22 }}
@@ -237,7 +238,7 @@ export function RenderStage({
                 ? { left: "34%", right: "48%" }
                 : { left: "0%", right: "0%" }
             }
-            transition={reduced ? { duration: 0 } : { duration: 1.1, ease: [0.2, 0.8, 0.2, 1] }}
+            transition={reduced ? { duration: 0 } : { duration: 1.1, ease: EASE }}
             style={{ opacity: index >= ORDER.indexOf("choose") ? 1 : 0.25 }}
           />
         </div>
@@ -251,12 +252,12 @@ export function RenderStage({
             initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={reduced ? { opacity: 0 } : { opacity: 0, y: -8 }}
-            transition={{ duration: 0.28, ease: [0.2, 0.8, 0.2, 1] }}
+            transition={{ duration: 0.28, ease: EASE }}
           >
-            <h2 className="display text-[24px] text-white md:text-[27px]">
+            <h2 className="display text-d2 text-white md:text-d3">
               {stage === "done" ? "Ready" : current.label}
             </h2>
-            <p className="mt-2 line-clamp-2 min-h-[21px] text-[14.5px] text-white/55">
+            <p className="mt-2 line-clamp-2 min-h-[21px] text-base text-white/55">
               {note || current.detail}
             </p>
           </motion.div>
@@ -274,12 +275,12 @@ export function RenderStage({
                     className="block h-full rounded-full bg-brand"
                     initial={false}
                     animate={{ width: done ? "100%" : active ? "55%" : "0%" }}
-                    transition={{ duration: reduced ? 0 : 0.6, ease: [0.2, 0.8, 0.2, 1] }}
+                    transition={{ duration: reduced ? 0 : 0.6, ease: EASE }}
                   />
                 </span>
                 <span
                   className={cn(
-                    "truncate text-[11px] font-medium transition-colors",
+                    "truncate text-micro font-medium transition-colors",
                     active ? "text-white" : done ? "text-white/50" : "text-white/25",
                   )}
                 >
@@ -296,7 +297,7 @@ export function RenderStage({
           className="h-full bg-brand"
           initial={{ width: 0 }}
           animate={{ width: `${pct}%` }}
-          transition={{ duration: reduced ? 0 : 0.8, ease: [0.2, 0.8, 0.2, 1] }}
+          transition={{ duration: reduced ? 0 : 0.8, ease: EASE }}
         />
       </div>
     </div>

@@ -23,9 +23,9 @@ export function SettingsSection({
       )}
     >
       <div className="min-w-0">
-        <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
+        <h2 className="text-md font-semibold text-ink">{title}</h2>
         {description ? (
-          <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted">{description}</p>
+          <p className="mt-1.5 text-sm text-muted">{description}</p>
         ) : null}
       </div>
       <div className="min-w-0">{children}</div>
@@ -46,8 +46,8 @@ export function SettingsRow({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
       <div className="min-w-0">
-        <p className="text-[12.5px] text-muted">{label}</p>
-        <div className="mt-0.5 truncate text-[15px] text-ink">{value}</div>
+        <p className="text-caption text-muted">{label}</p>
+        <div className="mt-0.5 truncate text-md text-ink">{value}</div>
       </div>
       {action}
     </div>

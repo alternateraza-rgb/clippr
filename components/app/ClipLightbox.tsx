@@ -48,30 +48,38 @@ export function ClipLightbox({
 
           <motion.div
             className="relative flex max-h-full flex-col items-center gap-4"
-            initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
-            transition={base}
             onClick={(e) => e.stopPropagation()}
           >
-            <video
+            {/* Same layoutId as the card in the grid, so the clip you clicked
+                travels up into the lightbox rather than one fading out while an
+                unrelated copy fades in somewhere else. */}
+            <motion.video
+              layoutId={reduced ? undefined : `clip-${render.id}`}
+              style={{ borderRadius: "var(--radius-panel)" }}
+              transition={base}
               src={render.downloadUrl ?? undefined}
               poster={render.posterUrl ?? undefined}
               controls
               autoPlay
               loop
               playsInline
-              className="max-h-[70vh] rounded-[var(--radius-panel)] bg-black shadow-pop"
+              className="max-h-[70vh] bg-black shadow-pop"
             />
 
-            <div className="flex w-full max-w-[46ch] flex-col items-center gap-3 text-center">
+            <motion.div
+              className="flex w-full max-w-[46ch] flex-col items-center gap-3 text-center"
+              initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ ...base, delay: reduced ? 0 : 0.12 }}
+            >
               {render.topic ? (
-                <p className="display text-[19px] leading-snug text-on-brand">{render.topic}</p>
+                <p className="display text-d1 text-on-brand">{render.topic}</p>
               ) : render.hook ? (
-                <p className="text-[15px] leading-snug text-on-brand">{render.hook}</p>
+                <p className="text-md text-on-brand">{render.hook}</p>
               ) : null}
               {render.why ? (
-                <p className="text-[13.5px] leading-relaxed text-on-brand/70">{render.why}</p>
+                <p className="text-sm text-on-brand/70">{render.why}</p>
               ) : null}
               <Pill
                 variant="ghost"
@@ -87,7 +95,7 @@ export function ClipLightbox({
                 <Download className="h-4 w-4" strokeWidth={1.9} />
                 Download
               </Pill>
-            </div>
+            </motion.div>
           </motion.div>
 
           <button

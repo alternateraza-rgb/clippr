@@ -8,6 +8,7 @@ import { ClipProposal } from "@/components/clip/ClipProposal";
 import { RenderStage, progressFor, type StageId } from "@/components/clip/RenderStage";
 import { BeforeYouPost } from "@/components/app/BeforeYouPost";
 import { PageHeader } from "@/components/app/PageHeader";
+import { UrlPaste } from "@/components/app/UrlPaste";
 import { usePrefersReducedMotion } from "@/components/motion/usePrefersReducedMotion";
 import { base } from "@/components/motion/presets";
 import { Pill } from "@/components/ui/Pill";
@@ -361,54 +362,28 @@ function StudioInner() {
               lede="Paste a longform YouTube link. We watch the whole thing, pick the strongest minute, and edit it into a vertical clip."
             />
 
-            <div className="mt-8 rounded-[var(--radius-panel)] bg-void p-6 text-white md:p-7">
-              <div className="flex flex-col gap-2.5 sm:flex-row">
-                <input
-                  value={raw}
-                  onChange={(e) => {
-                    setRaw(e.target.value);
-                    setError("");
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") submit();
-                  }}
-                  placeholder="Paste a long YouTube link (8+ min)"
-                  aria-label="YouTube link"
-                  className="min-w-0 flex-1 rounded-[var(--radius-pill)] bg-white/10 px-5 py-3.5 text-[15px] text-white outline-none ring-1 ring-inset ring-white/15 transition-shadow placeholder:text-white/40 focus:ring-2 focus:ring-white/60"
-                />
-                <button
-                  type="button"
-                  onClick={submit}
-                  className="shrink-0 rounded-[var(--radius-pill)] bg-brand px-7 py-3.5 text-[15px] font-semibold text-on-brand shadow-[inset_0_1px_0_rgb(255_255_255/0.22)] transition-colors hover:bg-brand-hover active:scale-[0.98]"
-                >
-                  Clip it
-                </button>
-              </div>
+            <UrlPaste
+              className="mt-8"
+              value={raw}
+              onChange={(next) => {
+                setRaw(next);
+                setError("");
+              }}
+              onSubmit={submit}
+              placeholder="Paste a long YouTube link (8+ min)"
+              error={error}
+              hint="One clip per video — the best 50 to 60 seconds on the tape."
+            />
 
-              {error ? (
-                <motion.p
-                  initial={reduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-3 text-[13.5px] text-brand-tint"
-                >
-                  {error}
-                </motion.p>
-              ) : null}
-
-              <p className="mt-4 text-[12.5px] text-white/40">
-                One clip per video — the best 50 to 60 seconds on the tape.
-              </p>
-            </div>
-
-            <ol className="mt-8 grid gap-px overflow-hidden rounded-[var(--radius-card)] bg-hairline sm:grid-cols-3">
+            <ol className="mt-8 grid gap-px overflow-hidden rounded-card bg-hairline sm:grid-cols-3">
               {[
                 ["Listens", "Every word, timed to the audio."],
                 ["Chooses", "The topic, and the moments that tell it."],
                 ["Edits", "Framed vertical, captions burned in."],
               ].map(([title, body]) => (
                 <li key={title} className="bg-surface p-5">
-                  <p className="text-[13.5px] font-semibold text-ink">{title}</p>
-                  <p className="mt-1.5 text-[13px] leading-relaxed text-muted">{body}</p>
+                  <p className="text-sm font-semibold text-ink">{title}</p>
+                  <p className="mt-1.5 text-sm text-muted">{body}</p>
                 </li>
               ))}
             </ol>
@@ -430,7 +405,7 @@ function StudioInner() {
               note={note}
               videoId={videoId ?? undefined}
             />
-            <p className="mt-5 text-center text-[13px] text-muted">
+            <p className="mt-5 text-center text-sm text-muted">
               {rescanning
                 ? "Looking somewhere else on the tape."
                 : "Nothing renders until you have seen the cut and said yes."}
@@ -461,7 +436,7 @@ function StudioInner() {
                 rescanning={rescanning}
               />
             </div>
-            {error ? <p className="mt-4 text-[13.5px] text-brand">{error}</p> : null}
+            {error ? <p className="mt-4 text-sm text-brand">{error}</p> : null}
           </motion.div>
         ) : null}
 
@@ -479,7 +454,7 @@ function StudioInner() {
               note={note}
               videoId={videoId ?? undefined}
             />
-            <p className="mt-5 text-center text-[13px] text-muted">
+            <p className="mt-5 text-center text-sm text-muted">
               You can leave this page — the clip lands in your Library when it is done.
             </p>
           </motion.div>
@@ -511,7 +486,7 @@ function StudioInner() {
               autoPlay
               loop
               playsInline
-              className="mt-5 max-h-[58vh] rounded-[var(--radius-panel)] bg-black shadow-pop"
+              className="mt-5 max-h-[58vh] rounded-panel bg-black shadow-pop"
             />
 
             <motion.div
@@ -521,19 +496,19 @@ function StudioInner() {
               transition={{ ...base, delay: 0.24 }}
             >
               {clip.topic ? (
-                <h2 className="display text-[21px] leading-snug text-ink">{clip.topic}</h2>
+                <h2 className="display text-d1 text-ink">{clip.topic}</h2>
               ) : clip.hook ? (
-                <h2 className="display text-[21px] leading-snug text-ink">
+                <h2 className="display text-d1 text-ink">
                   &ldquo;{clip.hook}&rdquo;
                 </h2>
               ) : null}
 
               {clip.why ? (
-                <p className="mt-3 text-[14.5px] leading-relaxed text-body">{clip.why}</p>
+                <p className="mt-3 text-base text-body">{clip.why}</p>
               ) : null}
 
               {clip.segments > 1 ? (
-                <p className="mt-3 text-[12.5px] text-muted">
+                <p className="mt-3 text-caption text-muted">
                   Built from {clip.segments} moments across the video
                 </p>
               ) : null}
@@ -569,9 +544,9 @@ function StudioInner() {
             </motion.div>
 
             {saveError ? (
-              <p className="mt-3 text-[13px] text-brand">{saveError}</p>
+              <p className="mt-3 text-sm text-brand">{saveError}</p>
             ) : (
-              <p className="mt-4 text-[12.5px] text-muted">
+              <p className="mt-4 text-caption text-muted">
                 Kept in your Library — download it now or any time later.
               </p>
             )}

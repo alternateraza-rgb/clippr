@@ -1,5 +1,6 @@
 import { Star } from "lucide-react";
 import { Band, SectionHead } from "@/components/landing/Section";
+import { Card } from "@/components/ui/Card";
 import { Reveal } from "@/components/motion/Reveal";
 import { Tag } from "@/components/ui/Chip";
 
@@ -54,27 +55,24 @@ export function LandingReviews() {
       />
       <Reveal className="mt-14 grid gap-5 md:grid-cols-3">
         {REVIEWS.map((review) => (
-          <article
-            key={review.name}
-            className="flex h-full flex-col rounded-[var(--radius-card)] bg-surface p-7 shadow-hairline"
-          >
+          <Card as="article" key={review.name} padding="lg" className="flex h-full flex-col">
             <div className="flex items-center justify-between gap-3">
               <Stars />
               <Tag>Sample</Tag>
             </div>
-            <p className="mt-5 flex-1 text-[15.5px] leading-relaxed text-ink">
+            <p className="mt-5 flex-1 text-md text-ink">
               &ldquo;{review.quote}&rdquo;
             </p>
             <div className="mt-7 flex items-center gap-3 border-t border-hairline pt-5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-[12px] font-semibold text-on-brand">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-caption font-semibold text-on-brand">
                 {review.initials}
               </span>
               <div className="min-w-0">
-                <p className="text-[14px] font-medium text-ink">{review.name}</p>
-                <p className="truncate text-[12.5px] text-muted">{review.handle}</p>
+                <p className="text-base font-medium text-ink">{review.name}</p>
+                <p className="truncate text-caption text-muted">{review.handle}</p>
               </div>
             </div>
-          </article>
+          </Card>
         ))}
       </Reveal>
     </Band>

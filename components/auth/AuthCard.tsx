@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { login, signup, type AuthState } from "@/app/auth/actions";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Pill } from "@/components/ui/Pill";
+import { TextInput } from "@/components/ui/TextInput";
 import { hasSupabase } from "@/lib/config";
 import { useProfile } from "@/lib/store/profile";
 
@@ -34,7 +35,7 @@ export function AuthCard({
   if (state.checkEmail) {
     return (
       <AuthShell title="Check your email." subtitle="Confirm the link we sent, then you’ll land in onboarding.">
-        <p className="mt-8 text-[14px] text-muted">{footer}</p>
+        <p className="mt-8 text-base text-muted">{footer}</p>
       </AuthShell>
     );
   }
@@ -51,31 +52,31 @@ export function AuthCard({
         }}
       >
         {showName ? (
-          <input
+          <TextInput
+            shape="pill"
             name="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Your name"
             autoComplete="name"
-            className="w-full rounded-[var(--radius-pill)] bg-surface px-5 py-3.5 text-[15px] text-ink outline-none shadow-[inset_0_0_0_1px_var(--color-hairline)] transition-shadow placeholder:text-muted focus:shadow-[inset_0_0_0_1.5px_var(--color-ink)]"
           />
         ) : null}
-        <input
+        <TextInput
+          shape="pill"
           type="email"
           name="email"
           required={authEnabled}
           autoComplete="email"
           placeholder="Email"
-          className="w-full rounded-[var(--radius-pill)] bg-surface px-5 py-3.5 text-[15px] text-ink outline-none shadow-[inset_0_0_0_1px_var(--color-hairline)] transition-shadow placeholder:text-muted focus:shadow-[inset_0_0_0_1.5px_var(--color-ink)]"
         />
-        <input
+        <TextInput
+          shape="pill"
           type="password"
           name="password"
           required={authEnabled}
           autoComplete={showName ? "new-password" : "current-password"}
           placeholder="Password"
           minLength={authEnabled ? 6 : undefined}
-          className="w-full rounded-[var(--radius-pill)] bg-surface px-5 py-3.5 text-[15px] text-ink outline-none shadow-[inset_0_0_0_1px_var(--color-hairline)] transition-shadow placeholder:text-muted focus:shadow-[inset_0_0_0_1.5px_var(--color-ink)]"
         />
         {state.error ? (
           <ErrorLine>{state.error}</ErrorLine>
@@ -91,13 +92,13 @@ export function AuthCard({
           {action}
         </Pill>
       </form>
-      <p className="mt-8 text-[14px] text-muted">{footer}</p>
+      <p className="mt-8 text-base text-muted">{footer}</p>
     </AuthShell>
   );
 }
 
 function ErrorLine({ children }: { children: React.ReactNode }) {
-  return <p className="text-[13px] text-brand">{children}</p>;
+  return <p className="text-sm text-brand">{children}</p>;
 }
 
 /** Supabase's callback and confirm routes bounce failures back as ?error=. */

@@ -78,8 +78,8 @@ export function ScoreBar({
   return (
     <div className={cn("min-w-0", className)}>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="truncate text-[12.5px] text-muted">{label}</span>
-        <span className="tnum text-[12.5px] font-medium text-ink">{clamped}</span>
+        <span className="truncate text-caption text-muted">{label}</span>
+        <span className="tnum text-caption font-medium text-ink">{clamped}</span>
       </div>
       <div className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-surface-warm-alt">
         <div
