@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { CheckoutPanel } from "@/components/billing/CheckoutPanel";
+import { Pill } from "@/components/ui/Pill";
+import { signOut } from "@/app/auth/actions";
 import { Wordmark } from "@/components/ui/Wordmark";
 import { getSessionUser } from "@/lib/auth/session";
 import { billingEnforced } from "@/lib/config";
@@ -24,8 +26,16 @@ export default async function CheckoutPage() {
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
       <header className="border-b border-hairline px-6">
-        <div className="mx-auto flex h-[62px] max-w-[1120px] items-center">
+        <div className="mx-auto flex h-[62px] max-w-[1120px] items-center justify-between">
           <Wordmark size={20} />
+          {/* Without this the page is a dead end: the proxy sends every unpaid
+              account here and there is no way back out of it. A plain form so
+              it works before hydration and needs no client JS. */}
+          <form action={signOut}>
+            <Pill type="submit" variant="text" size="sm">
+              Sign out
+            </Pill>
+          </form>
         </div>
       </header>
       <div className="flex flex-1 items-center justify-center px-6 py-14">
