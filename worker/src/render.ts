@@ -117,12 +117,19 @@ async function encoderArgs(): Promise<string[]> {
       .then(({ stdout }) => stdout.includes("h264_videotoolbox"))
       .catch(() => false);
   }
-  // 3.5M is ample for 720x1280 talking-head footage and keeps a 60s clip near
-  // 26MB. At 6M a slightly long clip crossed the storage object limit and the
-  // whole render failed at the last step, after all the work was done.
+  // A 60s clip used to land near 30MB because the bitrate was fixed: 3.5M was
+  // spent whether the frame was a still talking head or a fast cut. Quality is
+  // targeted instead of bitrate, so easy footage — which almost all of this is
+  // — costs a fraction of that, and hard footage still gets what it needs.
+  //
+  // The ceiling stays well under the bucket's object limit; overshooting it
+  // once failed a render at the very last step, after all the work was done.
+  //
+  // Every platform re-encodes on upload anyway, so bytes past the point of
+  // visible difference are spent twice and seen by nobody.
   return videotoolbox
-    ? ["-c:v", "h264_videotoolbox", "-b:v", "3.5M", "-maxrate", "4.5M", "-profile:v", "high"]
-    : ["-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-maxrate", "4.5M", "-bufsize", "9M"];
+    ? ["-c:v", "h264_videotoolbox", "-b:v", "2M", "-maxrate", "3M", "-profile:v", "high"]
+    : ["-c:v", "libx264", "-preset", "fast", "-crf", "25", "-maxrate", "3M", "-bufsize", "6M"];
 }
 
 export async function processRender(renderId: string) {
@@ -353,7 +360,7 @@ export async function processRender(renderId: string) {
         "-c:a",
         "aac",
         "-b:a",
-        "160k",
+        "128k",
         ...(gameplayFile ? ["-shortest"] : []),
         "-movflags",
         "+faststart",
