@@ -3,18 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { FolderOpen, Home, type LucideIcon, Scissors, Sparkles } from "lucide-react";
+import { Coins, FolderOpen, Home, type LucideIcon, Scissors, Sparkles } from "lucide-react";
 import { PageTransition } from "@/components/motion/PageTransition";
 import { usePrefersReducedMotion } from "@/components/motion/usePrefersReducedMotion";
 import { Wordmark } from "@/components/ui/Wordmark";
 import { useProfile } from "@/lib/store/profile";
 import { cn } from "@/lib/cn";
 
-const NAV: { href: string; label: string; icon: LucideIcon }[] = [
+/** `short` is the tab-bar label: five full names don't fit across a phone. */
+const NAV: { href: string; label: string; short?: string; icon: LucideIcon }[] = [
   { href: "/app", label: "Home", icon: Home },
   { href: "/app/ideas", label: "Ideas", icon: Sparkles },
   { href: "/app/studio", label: "Studio", icon: Scissors },
   { href: "/app/library", label: "Library", icon: FolderOpen },
+  { href: "/app/rewards", label: "Content Rewards", short: "Rewards", icon: Coins },
 ];
 
 /** Stiff enough to arrive with the page, soft enough to read as travel. */
@@ -119,7 +121,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex flex-col items-center gap-1 rounded-control px-3 py-1.5",
+                  "relative flex flex-col items-center gap-1 rounded-control px-2 py-1.5",
                   "text-micro font-medium transition-colors duration-[var(--dur-fast)]",
                   active ? "text-brand" : "text-muted",
                 )}
@@ -129,11 +131,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <motion.span
                     layoutId="tab-active"
                     transition={reduced ? { duration: 0 } : navSpring}
-                    className="absolute inset-x-3 -top-px h-[2px] rounded-full bg-brand"
+                    className="absolute inset-x-2 -top-px h-[2px] rounded-full bg-brand"
                   />
                 ) : null}
                 <Icon className="h-[19px] w-[19px]" strokeWidth={2} />
-                {item.label}
+                {item.short ?? item.label}
               </Link>
             );
           })}
