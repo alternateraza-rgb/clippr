@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { usePrefersReducedMotion } from "@/components/motion/usePrefersReducedMotion";
@@ -7,41 +8,59 @@ import { usePrefersReducedMotion } from "@/components/motion/usePrefersReducedMo
 /**
  * The creators orbit your clip.
  *
- * Two dashed tracks, counter-rotating, with a 9:16 frame anchored at the
- * middle — the whole idea of the feature in one picture: their longform in
- * the ring, your cut in the centre. Faces stay upright because each one
- * counter-spins its own ring, so the ring travels and the portrait doesn't
- * tumble.
+ * One ring, turning slowly, with a 9:16 frame anchored at the middle — the
+ * whole idea of the feature in one picture: their longform in the ring, your
+ * cut in the centre. Faces stay upright because each portrait counter-spins
+ * the ring exactly, so the ring travels and the face doesn't tumble.
  *
- * Positions are percentages of a square stage rather than pixels, so the
- * whole thing scales from a phone to a wide desktop without a single
+ * Five is the shape this is drawn for. Fewer, larger portraits read as people
+ * rather than as decoration, which is the entire point of putting faces here —
+ * eleven small discs was a pattern, not a cast.
+ *
+ * Positions and sizes are percentages of a square stage rather than pixels, so
+ * the whole thing scales from a phone to a wide desktop without a single
  * breakpoint. Reduced motion keeps the arrangement and stops the travel.
  */
 
 export type Creator = {
   name: string;
-  /** Drop a file in `public/creators/` and point at it — until then, a monogram. */
+  /** Only for a file that doesn't match the slug convention below. */
   src?: string;
 };
 
-/* The cast, until the real campaign list arrives from Whop. Swapping a name or
-   adding a portrait is a one-line edit here. */
-const OUTER: Creator[] = [
+/**
+ * Portraits live in `public/creators/`, named by slug: `iman-gadzhi.jpg`.
+ *
+ * Set to false to force monograms everywhere — useful before the files exist,
+ * since it stops the page firing requests it can only get a 404 for. Any one
+ * portrait that's missing or misnamed falls back to its monogram on its own,
+ * so a partial set degrades cleanly either way.
+ */
+const HAS_PORTRAITS = true;
+
+function portraitFor(creator: Creator): string | null {
+  if (creator.src) return creator.src;
+  if (!HAS_PORTRAITS) return null;
+  const slug = creator.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  return `/creators/${slug}.jpg`;
+}
+
+/* The cast, until the real campaign list arrives from Whop. Order is the ring,
+   clockwise from twelve — worth arranging by eye once the faces are in. */
+const CREATORS: Creator[] = [
   { name: "Iman Gadzhi" },
   { name: "Andrew Tate" },
   { name: "Alex Hormozi" },
-  { name: "Luke Belmar" },
   { name: "Grant Cardone" },
-  { name: "Dan Koe" },
+  { name: "Luke Belmar" },
 ];
 
-const INNER: Creator[] = [
-  { name: "Sam Ovens" },
-  { name: "Ali Abdaal" },
-  { name: "Cole Gordon" },
-  { name: "Charlie Morgan" },
-  { name: "Myron Gaines" },
-];
+/* Geometry, in percent of the stage. Kept together because they only make
+   sense against each other: the portraits have to clear the frame at the
+   centre, and their name labels have to clear the frame too. */
+const RADIUS = 37;
+const SIZE = 17.5;
+const SPIN_SECONDS = 58;
 
 function initialsOf(name: string) {
   return name
@@ -53,6 +72,7 @@ function initialsOf(name: string) {
 
 export function CreatorOrbit() {
   const reduced = usePrefersReducedMotion();
+  const spin = { duration: SPIN_SECONDS, repeat: Infinity, ease: "linear" } as const;
 
   return (
     <div className="relative mx-auto aspect-square w-full max-w-[540px]">
@@ -67,113 +87,78 @@ export function CreatorOrbit() {
         }}
       />
 
-      {/* Tracks, drawn not floated — the same hairline logic as a card. */}
+      {/* Tracks, drawn not floated — the same hairline logic as a card. The
+          inner one carries nothing; it's there so the space between the frame
+          and the ring reads as depth rather than as a gap. */}
       <div
         aria-hidden
-        className="absolute left-1/2 top-1/2 h-[79%] w-[79%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-white/10"
+        className="absolute left-1/2 top-1/2 h-[74%] w-[74%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-white/10"
       />
       <div
         aria-hidden
-        className="absolute left-1/2 top-1/2 h-[40%] w-[40%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-white/[0.07]"
-      />
-
-      <Ring
-        creators={INNER}
-        radiusPct={20}
-        sizePct={8.5}
-        duration={34}
-        clockwise={false}
-        reduced={reduced}
+        className="absolute left-1/2 top-1/2 h-[46%] w-[46%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-white/[0.06]"
       />
 
       <ClipFrame reduced={reduced} />
 
-      {/* Outer ring last so its portraits pass in front of the frame. */}
-      <Ring
-        creators={OUTER}
-        radiusPct={39.5}
-        sizePct={12.5}
-        duration={46}
-        clockwise
-        showNames
-        reduced={reduced}
-      />
+      {/* The ring renders last so the portraits pass in front of the frame. */}
+      <motion.div
+        className="absolute inset-0"
+        animate={reduced ? undefined : { rotate: 360 }}
+        transition={spin}
+      >
+        {CREATORS.map((creator, i) => {
+          // Start at twelve o'clock so the arrangement reads as deliberate.
+          const angle = (i / CREATORS.length) * Math.PI * 2 - Math.PI / 2;
+          return (
+            <div
+              key={creator.name}
+              className="absolute -translate-x-1/2 -translate-y-1/2"
+              style={{
+                left: `${50 + RADIUS * Math.cos(angle)}%`,
+                top: `${50 + RADIUS * Math.sin(angle)}%`,
+                width: `${SIZE}%`,
+              }}
+            >
+              {/* Equal and opposite: the ring carries the portrait around, this
+                  keeps the face the right way up the whole trip. */}
+              <motion.div
+                className="relative"
+                animate={reduced ? undefined : { rotate: -360 }}
+                transition={spin}
+              >
+                <Face creator={creator} />
+              </motion.div>
+            </div>
+          );
+        })}
+      </motion.div>
     </div>
   );
 }
 
-function Ring({
-  creators,
-  radiusPct,
-  sizePct,
-  duration,
-  clockwise,
-  showNames = false,
-  reduced,
-}: {
-  creators: Creator[];
-  radiusPct: number;
-  /** Width as a share of the stage, so a portrait scales with the ring it rides. */
-  sizePct: number;
-  duration: number;
-  clockwise: boolean;
-  showNames?: boolean;
-  reduced: boolean;
-}) {
-  const spin = { duration, repeat: Infinity, ease: "linear" } as const;
-  const ringTo = clockwise ? 360 : -360;
+function Face({ creator }: { creator: Creator }) {
+  // A portrait that 404s or fails to decode falls back rather than leaving a
+  // torn image in the ring — the monogram is a real state, not an error state.
+  const [broken, setBroken] = useState(false);
+  const src = broken ? null : portraitFor(creator);
 
-  return (
-    <motion.div
-      className="absolute inset-0"
-      animate={reduced ? undefined : { rotate: ringTo }}
-      transition={spin}
-    >
-      {creators.map((creator, i) => {
-        // Start at twelve o'clock so the arrangement reads as deliberate.
-        const angle = (i / creators.length) * Math.PI * 2 - Math.PI / 2;
-        return (
-          <div
-            key={creator.name}
-            className="absolute -translate-x-1/2 -translate-y-1/2"
-            style={{
-              left: `${50 + radiusPct * Math.cos(angle)}%`,
-              top: `${50 + radiusPct * Math.sin(angle)}%`,
-              width: `${sizePct}%`,
-            }}
-          >
-            {/* Equal and opposite: the ring carries the portrait around, this
-                keeps the face the right way up the whole trip. */}
-            <motion.div
-              className="relative"
-              animate={reduced ? undefined : { rotate: -ringTo }}
-              transition={spin}
-            >
-              <Face creator={creator} showName={showNames} />
-            </motion.div>
-          </div>
-        );
-      })}
-    </motion.div>
-  );
-}
-
-function Face({ creator, showName }: { creator: Creator; showName: boolean }) {
   return (
     <>
       {/* A container, so the monogram is sized by the portrait rather than by
-          the page — the two rings render the same face at two scales. */}
+          the page. */}
       <div
         style={{ containerType: "inline-size" }}
-        className="relative aspect-square w-full overflow-hidden rounded-full bg-void-soft shadow-[inset_0_0_0_1px_rgb(255_255_255/0.14)]"
+        className="relative aspect-square w-full overflow-hidden rounded-full bg-void-soft shadow-[inset_0_0_0_1px_rgb(255_255_255/0.16),0_10px_30px_rgb(0_0_0/0.45)]"
       >
-        {creator.src ? (
+        {src ? (
           <Image
-            src={creator.src}
+            src={src}
             alt={creator.name}
             fill
-            sizes="(min-width: 1024px) 70px, 12vw"
+            sizes="(min-width: 1024px) 96px, 18vw"
             className="object-cover"
+            onError={() => setBroken(true)}
           />
         ) : (
           <span
@@ -183,13 +168,17 @@ function Face({ creator, showName }: { creator: Creator; showName: boolean }) {
             {initialsOf(creator.name)}
           </span>
         )}
+        {/* Drawn over the photo, so a bright headshot still ends on a defined
+            edge instead of bleeding into the panel. */}
+        <span
+          aria-hidden
+          className="absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_rgb(255_255_255/0.18)]"
+        />
         <span className="sr-only">{creator.name}</span>
       </div>
-      {showName ? (
-        <span className="absolute left-1/2 top-[calc(100%+7px)] hidden -translate-x-1/2 whitespace-nowrap text-micro font-medium text-white/50 sm:block">
-          {creator.name}
-        </span>
-      ) : null}
+      <span className="absolute left-1/2 top-[calc(100%+10px)] -translate-x-1/2 whitespace-nowrap text-micro font-medium text-white/55">
+        {creator.name}
+      </span>
     </>
   );
 }
@@ -197,7 +186,7 @@ function Face({ creator, showName }: { creator: Creator; showName: boolean }) {
 /** Your cut, at the centre of everything they publish. */
 function ClipFrame({ reduced }: { reduced: boolean }) {
   return (
-    <div className="absolute left-1/2 top-1/2 h-[28%] -translate-x-1/2 -translate-y-1/2">
+    <div className="absolute left-1/2 top-1/2 h-[32%] -translate-x-1/2 -translate-y-1/2">
       <motion.div
         className="relative flex h-full flex-col items-center justify-end overflow-hidden rounded-card bg-void px-2 pb-3 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.16)]"
         style={{ aspectRatio: "9 / 16" }}
