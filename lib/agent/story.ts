@@ -60,12 +60,14 @@ export function buildSegments(raw: unknown, words: WordTiming[]): StorySegment[]
     const at = findPhrase(words, startQuote, hintStart ?? undefined);
     const from = at >= 0 ? words[at].start : hintStart;
     if (from == null) continue;
+    const startAnchored = at >= 0;
 
     // The end of the quoted closing line, not a timestamp. Searched forward
     // from the segment's own start so a phrase repeated later in the tape
     // cannot stretch the segment across half the video.
     const closing = endQuote ? findPhraseSpan(words, endQuote, from) : null;
     let to = closing && words[closing.to].end > from ? words[closing.to].end : null;
+    const endAnchored = to != null;
 
     if (to == null || to - from < MIN_SEGMENT_S || to - from > MAX_SEGMENT_S) {
       // No usable closing quote: fall back to the model's numbers, which at
@@ -75,6 +77,17 @@ export function buildSegments(raw: unknown, words: WordTiming[]): StorySegment[]
       const lastWord = words.find((w) => w.start >= from + span) ?? words[words.length - 1];
       to = Math.max(from + MIN_SEGMENT_S, lastWord.end);
     }
+
+    // One line per segment, so the anchor hit rate is greppable in production.
+    // It is the number that decides whether the model is worth changing: the
+    // model's only influence on where a cut lands is whether its quotes can be
+    // found, and a fallback here is a boundary taken from the clock instead.
+    console.info(
+      `[diag] segment anchor=start:${startAnchored ? "quote" : "hint"},` +
+        `end:${endAnchored ? "quote" : "hint"} ` +
+        `drift=${startAnchored && hintStart != null ? (from - hintStart).toFixed(1) : "n/a"}s ` +
+        `role=${role(record.role)}`,
+    );
 
     drafts.push({
       start: Math.max(0, from),
@@ -93,29 +106,53 @@ export function buildSegments(raw: unknown, words: WordTiming[]): StorySegment[]
   for (const draft of drafts) {
     const previous = ordered[ordered.length - 1];
     if (previous && draft.start < previous.end + MERGE_GAP_S) {
-      previous.end = Math.max(previous.end, draft.end);
-      continue;
+      // Merge only when the result is still a segment. A bad anchor that put
+      // this draft's end a minute late would otherwise be swallowed whole,
+      // dragging a minute of unchosen speech into the previous span.
+      const merged = Math.max(previous.end, draft.end);
+      if (merged - previous.start <= MAX_SEGMENT_S) {
+        previous.end = merged;
+        continue;
+      }
     }
     ordered.push(draft);
   }
 
-  return fit(ordered);
+  // Deliberately unfitted. The caller measures the real total and sends it back
+  // to the model, which is the only party that can shorten a story by choosing
+  // less of it. Fitting here hid the overrun from that correction entirely.
+  return ordered;
 }
 
 /**
- * Keeps the clip near the target without ever cutting inside a thought.
+ * Last resort, when the model has already been asked twice to shorten the story
+ * and hasn't. Exported because the decision to give up belongs to the caller.
  *
  * Nothing here trims: a span ends where the model said the sentence ends, and
  * shaving seconds off that end is exactly the damage this is meant to prevent.
- * The only lever is dropping a whole middle beat, and only when the clip is
- * genuinely too long — the opening and the payoff are never candidates.
+ * The only lever is dropping a whole beat.
+ *
+ * Which beat matters. Dropping the longest middle segment is how the turn used
+ * to disappear — it is usually the longest thing in the clip, and a clip whose
+ * reversal has been deleted is the "this makes no sense" complaint. So the
+ * setup, the turn and the payoff are all off the table, and if only those
+ * remain the clip runs long instead. A 78-second clip with an intact arc is a
+ * better video than a 60-second one missing its middle.
  */
-function fit(segments: StorySegment[]): StorySegment[] {
+export function fit(segments: StorySegment[]): StorySegment[] {
   let result = segments.map((s) => ({ ...s }));
 
   while (totalDuration(result) > TARGET_MAX_S + OVERSHOOT_S && result.length > 2) {
-    const middles = result.slice(1, -1);
-    const fattest = middles.reduce((a, b) => (b.end - b.start > a.end - a.start ? b : a));
+    const turns = result.filter((s) => s.role === "turn").length;
+    const droppable = result
+      .slice(1, -1)
+      .filter((s) => s.role !== "payoff" && !(s.role === "turn" && turns <= 1));
+    if (!droppable.length) break;
+    const fattest = droppable.reduce((a, b) => (b.end - b.start > a.end - a.start ? b : a));
+    console.info(
+      `[diag] fit dropped role=${fattest.role} ` +
+        `dur=${(fattest.end - fattest.start).toFixed(1)}s to reach ${TARGET_MAX_S + OVERSHOOT_S}s`,
+    );
     result = result.filter((s) => s !== fattest);
   }
 

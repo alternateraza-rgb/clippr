@@ -203,20 +203,37 @@ export async function processRender(renderId: string) {
           [cutFrom, cutTo],
           probe.words,
         );
+        const moved =
+          Math.abs(snappedTo - cutTo) > 0.2 || Math.abs(snappedFrom - cutFrom) > 0.2;
         if (snappedTo - snappedFrom > 3) {
-          if (Math.abs(snappedTo - cutTo) > 0.2 || Math.abs(snappedFrom - cutFrom) > 0.2) {
+          if (moved) {
             console.info(
               `[render] segment ${index + 1} snapped to sentence bounds: ` +
                 `${cutFrom.toFixed(1)}-${cutTo.toFixed(1)} → ${snappedFrom.toFixed(1)}-${snappedTo.toFixed(1)}`,
             );
           }
+          console.info(
+            `[diag] render=${renderId} seg=${index + 1}/${segments.length} ` +
+              `snap=${moved ? "applied" : "already-on-bounds"} ` +
+              `startDelta=${(snappedFrom - cutFrom).toFixed(2)}s endDelta=${(snappedTo - cutTo).toFixed(2)}s`,
+          );
           cutFrom = snappedFrom;
           cutTo = snappedTo;
+        } else {
+          // Distinct from "already perfect", and the distinction is the point:
+          // no sentence boundary inside the window means the caption timeline is
+          // further out than the snap can reach, not that the cut was good.
+          console.info(
+            `[diag] render=${renderId} seg=${index + 1}/${segments.length} snap=no-candidate-in-window`,
+          );
         }
         await rm(probeAudio, { force: true }).catch(() => null);
       } catch (probeErr) {
         // A failed probe means the model's own boundary stands. Worse cut,
         // still a clip.
+        console.info(
+          `[diag] render=${renderId} seg=${index + 1}/${segments.length} snap=probe-failed`,
+        );
         console.warn(
           `[render] boundary probe failed on segment ${index + 1}`,
           probeErr instanceof Error ? probeErr.message.slice(0, 120) : probeErr,

@@ -79,6 +79,22 @@ export async function writeVideoCache(video: VideoMeta): Promise<void> {
   });
 }
 
+/**
+ * A transcript whose whole runtime is one or two segments never came from a
+ * caption track — it is the fabricated timeline Supadata's plain-text branch
+ * used to return, with every word interpolated linearly across the tape.
+ *
+ * `transcript_cache` is keyed on `video_id` alone, with no version and no
+ * provenance, so a row written once is served forever. Rejecting on the shape
+ * is what retires those rows without a schema change: the read misses, and the
+ * video is re-fetched through a provider that has real timings.
+ */
+function fabricated(segments: { start?: number; end?: number }[]): boolean {
+  if (segments.length > 2) return false;
+  const coverage = segments.reduce((max, s) => Math.max(max, Number(s?.end) || 0), 0);
+  return coverage > 120;
+}
+
 export async function readTranscriptCache(videoId: string): Promise<TranscriptResult | null> {
   const supabase = await createClient();
   if (!supabase) return null;
@@ -92,6 +108,10 @@ export async function readTranscriptCache(videoId: string): Promise<TranscriptRe
   const words = data.words ?? [];
   const segments = data.segments ?? [];
   if (!words.length) return null;
+  if (fabricated(segments)) {
+    console.warn(`[transcript] ${videoId}: cached timeline is fabricated — refetching`);
+    return null;
+  }
   return {
     segments,
     words,
@@ -103,6 +123,11 @@ export async function readTranscriptCache(videoId: string): Promise<TranscriptRe
 export async function writeTranscriptCache(videoId: string, transcript: TranscriptResult): Promise<void> {
   const supabase = await writeClient();
   if (!supabase) return;
+  // Refuse to persist what the read would reject on the way back out.
+  if (fabricated(transcript.segments)) {
+    console.warn(`[transcript] ${videoId}: refusing to cache a fabricated timeline`);
+    return;
+  }
   await supabase.from("transcript_cache").upsert({
     video_id: videoId,
     language: transcript.language,

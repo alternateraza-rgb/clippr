@@ -5,6 +5,36 @@ function normalize(text: string) {
 }
 
 /**
+ * Whether a transcript word is the word the model quoted.
+ *
+ * Not `includes` in either direction: that made "the" match "there", "they" and
+ * "them", so a quote built mostly from function words could anchor almost
+ * anywhere. Exact, or a shared prefix long enough to be the same word inflected
+ * differently — "invest" / "investing" — and nothing shorter.
+ */
+function sameWord(word: string, token: string) {
+  if (word === token) return true;
+  const shorter = Math.min(word.length, token.length);
+  if (shorter < 4) return false;
+  return word.slice(0, shorter) === token.slice(0, shorter);
+}
+
+/**
+ * The words of a quote worth matching on.
+ *
+ * Short function words are dropped because they match everywhere, but dropping
+ * everything under three letters threw away whole quotes: "and that was it"
+ * reduced to two tokens and failed the minimum, so a correctly-quoted ending
+ * fell through to a clock-derived boundary. Keep two-letter words when the
+ * quote needs them to reach a usable length.
+ */
+function quoteTokens(phrase: string): string[] {
+  const all = normalize(phrase).split(" ").filter(Boolean);
+  const strong = all.filter((t) => t.length > 2);
+  return strong.length >= 3 ? strong : all.filter((t) => t.length >= 2);
+}
+
+/**
  * Index of the word where `phrase` starts, or -1.
  *
  * Timestamps from a model drift; the words it quotes do not. Locating the
@@ -19,11 +49,13 @@ export function findPhraseSpan(
   phrase: string,
   near?: number,
 ): { from: number; to: number } | null {
-  const from = findPhrase(words, phrase, near);
+  // "first-after", not "nearest": this is called with the segment's own start,
+  // and the nearest match to that can sit *before* it. The caller then rejects
+  // the backwards span and falls through to a clock-derived end — the exact
+  // mid-sentence cut this function exists to prevent.
+  const from = findPhrase(words, phrase, near, "first-after");
   if (from < 0) return null;
-  const tokens = normalize(phrase)
-    .split(" ")
-    .filter((t) => t.length > 2);
+  const tokens = quoteTokens(phrase);
   // Walk forward over the same tokens to find where the quote stops.
   //
   // Skips are bounded: an unbounded lenient walk lets a short token like "it"
@@ -36,7 +68,7 @@ export function findPhraseSpan(
   while (matched < tokens.length && k < words.length && skips <= 2) {
     const word = normalize(words[k].text);
     const token = tokens[matched];
-    if (word && (word === token || word.includes(token) || token.includes(word))) {
+    if (word && sameWord(word, token)) {
       matched += 1;
       last = k;
       skips = 0;
@@ -48,12 +80,15 @@ export function findPhraseSpan(
   return { from, to: last };
 }
 
-export function findPhrase(words: WordTiming[], phrase: string, near?: number): number {
+export function findPhrase(
+  words: WordTiming[],
+  phrase: string,
+  near?: number,
+  /** "nearest" to `near`, or the first match at or after it. */
+  mode: "nearest" | "first-after" = "nearest",
+): number {
   if (!words.length) return -1;
-  const tokens = normalize(phrase)
-    .split(" ")
-    .filter((t) => t.length > 2)
-    .slice(0, 7);
+  const tokens = quoteTokens(phrase).slice(0, 7);
   if (tokens.length < 3) return -1;
 
   const texts = words.map((w) => normalize(w.text));
@@ -68,7 +103,7 @@ export function findPhrase(words: WordTiming[], phrase: string, near?: number): 
         k += 1;
         continue;
       }
-      if (word === token || word.includes(token) || token.includes(word)) {
+      if (sameWord(word, token)) {
         matched += 1;
         k += 1;
         continue;
@@ -81,6 +116,12 @@ export function findPhrase(words: WordTiming[], phrase: string, near?: number): 
   if (!hits.length) return -1;
   if (near == null) return hits[0];
   const target = near;
+  if (mode === "first-after") {
+    // A hair of tolerance, so a closing quote that begins on the segment's own
+    // first word still counts as being at or after it.
+    const forward = hits.find((i) => words[i].start >= target - 0.25);
+    return forward ?? -1;
+  }
   // People repeat themselves, so a phrase can match in several places. The
   // model's timestamp is rough but it is not random — take the match nearest
   // to it rather than the first one in the tape.

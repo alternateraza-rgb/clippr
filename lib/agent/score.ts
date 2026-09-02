@@ -1,7 +1,7 @@
 import { captionLinesForRange } from "@/lib/agent/compose";
 import { heuristicCandidates } from "@/lib/agent/heuristic";
 import { RUBRIC } from "@/lib/agent/rubric";
-import { buildSegments, TARGET_MAX_S, TARGET_MIN_S, totalDuration } from "@/lib/agent/story";
+import { buildSegments, fit, TARGET_MAX_S, TARGET_MIN_S, totalDuration } from "@/lib/agent/story";
 import { timedScript, type TranscriptResult } from "@/lib/agent/transcript";
 import { hasLlm } from "@/lib/config";
 import { completeJson } from "@/lib/llm/complete";
@@ -109,15 +109,75 @@ function toStory(raw: unknown, words: WordTiming[]): ClipCandidate[] {
   ];
 }
 
+/**
+ * The answer's shape, enforced rather than requested.
+ *
+ * Mirrors the closing block of RUBRIC. Every key is required and
+ * additionalProperties is off, because that is what OpenAI's strict mode
+ * demands — and because the field this exists to protect is `endQuote`: under
+ * plain JSON mode an answer that omitted it was still valid JSON, so the
+ * segment quietly lost its closing anchor and the cut fell back to the clock.
+ */
+const CLIP_SCHEMA = {
+  name: "clip",
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["topic", "hook", "whyItClips", "scores", "segments"],
+    properties: {
+      topic: { type: "string" },
+      hook: { type: "string" },
+      whyItClips: { type: "string" },
+      scores: {
+        type: "object",
+        additionalProperties: false,
+        required: ["hook", "emotion", "selfContained", "quotability", "payoff"],
+        properties: {
+          hook: { type: "number" },
+          emotion: { type: "number" },
+          selfContained: { type: "number" },
+          quotability: { type: "number" },
+          payoff: { type: "number" },
+        },
+      },
+      segments: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["start", "end", "startQuote", "endQuote", "role"],
+          properties: {
+            start: { type: "number" },
+            end: { type: "number" },
+            startQuote: { type: "string" },
+            endQuote: { type: "string" },
+            role: { type: "string", enum: ["setup", "beat", "turn", "payoff"] },
+          },
+        },
+      },
+    },
+  },
+} as const;
+
 async function scoreWithLlm(
   transcript: TranscriptResult,
   niche: Niche,
   extra?: string,
+  /** Last attempt: take what we can get rather than leaving the user nothing. */
+  lastChance = false,
 ): Promise<{ candidates: ClipCandidate[]; model: string; tokens: number }> {
   const script = timedScript(transcript.segments);
   const { text, tokens, model } = await completeJson({
-    system: `${RUBRIC}\nRespond with JSON: {"candidates":[{"start":0,"end":20,"hook":"","whyItClips":"","scores":{}}]}`,
+    // The rubric already closes with the shape it wants. The line that used to
+    // sit here advertised a different one — a `candidates` array — and the two
+    // disagreed in the same system message.
+    system: RUBRIC,
     user: extra ? `${extra}\n\nNiche: ${niche}\n\nTranscript:\n${script}` : `Niche: ${niche}\n\nTranscript:\n${script}`,
+    schema: CLIP_SCHEMA as unknown as { name: string; schema: Record<string, unknown> },
+    // Copying words out of a transcript exactly is not a creative task, and a
+    // paraphrased quote is one that cannot be found. Retries warm up so a
+    // rejected answer actually differs from the one before it.
+    temperature: extra ? 0.3 : 0,
   });
   let parsed: unknown;
   try {
@@ -137,10 +197,22 @@ async function scoreWithLlm(
   // arrives as two fragments where the first answer had a full arc. A 68s clip
   // with a setup and a payoff beats a 55s clip with neither.
   if (seconds < TARGET_MIN_S - 6 || seconds > TARGET_MAX_S + 12) {
-    const each = segments.map((s) => `${Math.round(s.end - s.start)}s`).join(" + ");
-    throw new Error(
-      `your segments measured ${each} = ${Math.round(seconds)}s total, but the clip must be ${TARGET_MIN_S}-${TARGET_MAX_S}s`,
-    );
+    if (!lastChance) {
+      const each = segments.map((s) => `${Math.round(s.end - s.start)}s`).join(" + ");
+      throw new Error(
+        `your segments measured ${each} = ${Math.round(seconds)}s total, but the clip must be ${TARGET_MIN_S}-${TARGET_MAX_S}s`,
+      );
+    }
+    // Out of attempts. A long clip with its arc intact beats an error message,
+    // so drop a beat here rather than returning nothing — the one place trimming
+    // is the lesser evil, and `fit` protects the setup, turn and payoff.
+    console.warn(`[diag] fit last-resort at ${Math.round(seconds)}s after 3 attempts`);
+    candidates[0].segments = fit(segments);
+    const kept = candidates[0].segments;
+    if (kept.length) {
+      candidates[0].start = kept[0].start;
+      candidates[0].end = kept[kept.length - 1].end;
+    }
   }
   return { candidates, model, tokens };
 }
@@ -178,7 +250,12 @@ export async function scoreTranscript(
       // A shape correction and a "not that one again" both belong in the same
       // turn; dropping either loses the constraint it was carrying.
       const extra = [avoid, correction].filter(Boolean).join("\n\n") || undefined;
-      const { candidates, model, tokens } = await scoreWithLlm(transcript, niche, extra);
+      const { candidates, model, tokens } = await scoreWithLlm(
+        transcript,
+        niche,
+        extra,
+        attempt === 2,
+      );
       return {
         candidates,
         meta: { model, tokens, ms: Date.now() - started, source: "llm" },
