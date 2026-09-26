@@ -175,3 +175,23 @@ export function llmModel() {
   if (env("LLM_MODEL")) return env("LLM_MODEL");
   return llmProvider() === "anthropic" ? "claude-sonnet-4-20250514" : "gpt-4o";
 }
+
+/**
+ * gpt-4o on the low OpenAI tier is 30k tokens per minute. A transcript call is
+ * several thousand tokens, so a busy minute 429s even though the key is valid.
+ * Mini has its own, much larger TPM pool. `off` keeps scoring on llmModel only.
+ */
+export function llmFallbackModel(primary: string) {
+  const set = env("LLM_FALLBACK_MODEL");
+  if (/^(off|none|false|0)$/i.test(set)) return "";
+  if (set) return set;
+  if (llmProvider() !== "openai") return "";
+  if (/mini/i.test(primary)) return "";
+  return "gpt-4o-mini";
+}
+
+/** Local pacing ceiling. A 429 tightens this to the limit the provider reported. */
+export function llmTpmBudget() {
+  const raw = Number(env("LLM_TPM_BUDGET"));
+  return Number.isFinite(raw) && raw >= 1000 ? raw : 200_000;
+}

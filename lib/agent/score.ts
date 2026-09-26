@@ -4,7 +4,7 @@ import { RUBRIC } from "@/lib/agent/rubric";
 import { buildSegments, TARGET_MAX_S, TARGET_MIN_S, totalDuration } from "@/lib/agent/story";
 import { timedScript, type TranscriptResult } from "@/lib/agent/transcript";
 import { hasLlm } from "@/lib/config";
-import { completeJson } from "@/lib/llm/complete";
+import { completeJson, isRateLimitMessage, isTransientLlmError } from "@/lib/llm/complete";
 import { weightedScore } from "@/lib/format";
 import type { ClipCandidate, Niche, ScoreBreakdown, WordTiming } from "@/lib/agent/types";
 
@@ -112,12 +112,16 @@ function toStory(raw: unknown, words: WordTiming[]): ClipCandidate[] {
 async function scoreWithLlm(
   transcript: TranscriptResult,
   niche: Niche,
-  extra?: string,
+  extra: string | undefined,
+  rateLimitWaitMs: number,
 ): Promise<{ candidates: ClipCandidate[]; model: string; tokens: number }> {
   const script = timedScript(transcript.segments);
   const { text, tokens, model } = await completeJson({
     system: `${RUBRIC}\nRespond with JSON: {"candidates":[{"start":0,"end":20,"hook":"","whyItClips":"","scores":{}}]}`,
     user: extra ? `${extra}\n\nNiche: ${niche}\n\nTranscript:\n${script}` : `Niche: ${niche}\n\nTranscript:\n${script}`,
+    // Shape corrections below share this deadline. Three immediate resends
+    // were how a single TPM 429 turned into three failed transcript calls.
+    rateLimitWaitMs,
   });
   let parsed: unknown;
   try {
@@ -167,6 +171,9 @@ export async function scoreTranscript(
   }
 
   const started = Date.now();
+  // Transcription already used part of the route's 120s. The rest is for the
+  // model, including one TPM wait — not three back-to-back full transcripts.
+  const llmDeadline = started + 40_000;
   const avoid = avoidNote(opts?.avoid ?? []);
   let last: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -178,7 +185,12 @@ export async function scoreTranscript(
       // A shape correction and a "not that one again" both belong in the same
       // turn; dropping either loses the constraint it was carrying.
       const extra = [avoid, correction].filter(Boolean).join("\n\n") || undefined;
-      const { candidates, model, tokens } = await scoreWithLlm(transcript, niche, extra);
+      const { candidates, model, tokens } = await scoreWithLlm(
+        transcript,
+        niche,
+        extra,
+        Math.max(0, llmDeadline - Date.now()),
+      );
       return {
         candidates,
         meta: { model, tokens, ms: Date.now() - started, source: "llm" },
@@ -186,11 +198,21 @@ export async function scoreTranscript(
     } catch (error) {
       last = error;
       console.error("[score] LLM attempt failed", attempt + 1, error);
+      // A 429 is not a bad clip. completeJson already waited and, if the
+      // minute was still full, tried the fallback model. Sending the transcript
+      // again here is what made the rate limit show up as a hard failure.
+      if (isTransientLlmError(error)) break;
     }
   }
   const detail = last instanceof Error ? last.message : "unknown error";
   if (blameKey(detail)) {
     throw new Error(`LLM scoring failed (${detail}). Check LLM_API_KEY / LLM_PROVIDER on Vercel.`);
+  }
+  if (isRateLimitMessage(detail)) {
+    throw new Error("LLM scoring hit the model's per-minute token limit. Wait a few seconds and run it again.");
+  }
+  if (isTransientLlmError(last)) {
+    throw new Error(`LLM scoring failed (${detail}). The model was unavailable — wait a few seconds and run it again.`);
   }
   throw new Error(`LLM scoring failed (${detail}). The key is set — the model reply could not be turned into clips.`);
 }
