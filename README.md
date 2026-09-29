@@ -1,4 +1,11 @@
+
+
 # Clipmuse
+## Demo : Uploading file_example_MP4_640_3MG.mp4…
+https://github.com/user-attachments/assets/89125663-64da-4346-b8dd-43f2feb90063
+
+
+
 
 Premium clipping studio. Paste a YouTube URL; the agent reads the transcript, scores high-retention moments, and previews a captioned 9:16 cut. Home/Ideas are live YouTube longform ranked by OpenAI. Transcripts come from Supadata; export downloads via Apify, then Render burns captions.
 
