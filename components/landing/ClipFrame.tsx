@@ -100,10 +100,10 @@ export function ClipFrame({
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/30" />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-3">
-        <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-white backdrop-blur-sm">
+        <span className="rounded-full bg-white/15 px-2.5 py-1 text-micro font-medium uppercase tracking-[0.08em] text-white backdrop-blur-sm">
           {clip.label}
         </span>
-        <span className="tnum rounded-full bg-white/15 px-2.5 py-1 text-[10.5px] font-medium text-white backdrop-blur-sm">
+        <span className="tnum rounded-full bg-white/15 px-2.5 py-1 text-micro font-medium text-white backdrop-blur-sm">
           {clip.views}
         </span>
       </div>
@@ -112,7 +112,7 @@ export function ClipFrame({
           Clipmuse wrote for them. Adding our own on top would double them up. */}
 
       {!autoplay ? (
-        <span className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1.5 text-[10.5px] font-medium text-white backdrop-blur-sm transition-opacity duration-300 group-hover:opacity-0">
+        <span className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1.5 text-micro font-medium text-white backdrop-blur-sm transition-opacity duration-300 group-hover:opacity-0">
           <Play className="h-3 w-3" fill="currentColor" strokeWidth={0} />
           Hover to play
         </span>

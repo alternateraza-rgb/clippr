@@ -33,10 +33,10 @@ export function PricingPlan() {
       <div className="mx-auto max-w-[1120px]">
         <Reveal className="mx-auto max-w-[760px] text-center">
           <p className="eyebrow text-brand">Pricing</p>
-          <h1 className="display-xl mx-auto mt-5 max-w-[14ch] text-[clamp(38px,6.4vw,68px)] text-ink">
+          <h1 className="display mx-auto mt-5 max-w-[14ch] text-d6 text-ink">
             One price. <span className="text-brand">Unlimited</span> clips.
           </h1>
-          <p className="mx-auto mt-6 max-w-[48ch] text-[17px] leading-relaxed text-body">
+          <p className="mx-auto mt-6 max-w-[48ch] text-lg text-body">
             No credit packs, no per-export fees, no counting how many videos you
             have left this month. One plan, everything in it.
           </p>
@@ -44,15 +44,15 @@ export function PricingPlan() {
 
         <div className="mt-16 grid gap-8 md:grid-cols-[minmax(0,400px)_1fr] md:gap-16">
           <Reveal>
-            <div className="rounded-[var(--radius-panel)] bg-void p-8 text-white">
+            <div className="rounded-panel bg-void p-8 text-white">
               <p className="eyebrow text-white/55">Everything, monthly</p>
 
               <div className="mt-5 flex items-baseline gap-2">
-                <span className="display-xl text-[64px] text-white">$150</span>
-                <span className="text-[15px] text-white/55">/ month</span>
+                <span className="display text-d5 text-white">$150</span>
+                <span className="text-md text-white/55">/ month</span>
               </div>
 
-              <p className="mt-5 text-[14.5px] leading-relaxed text-white/70">
+              <p className="mt-5 text-base text-white/70">
                 Unlimited generations. Cancel whenever you like — it stops at the
                 end of the month you already paid for.
               </p>
@@ -61,7 +61,7 @@ export function PricingPlan() {
                 Start clipping
               </StartCta>
 
-              <p className="mt-4 text-center text-[12.5px] text-white/45">
+              <p className="mt-4 text-center text-caption text-white/45">
                 Takes a minute to set up. Cancel any time.
               </p>
             </div>
@@ -74,8 +74,8 @@ export function PricingPlan() {
                     <Check className="h-3.5 w-3.5 text-brand" strokeWidth={2.5} />
                   </span>
                 <div>
-                  <p className="text-[16px] font-semibold text-ink">{item.title}</p>
-                  <p className="mt-1 max-w-[48ch] text-[14.5px] leading-relaxed text-body">
+                  <p className="text-lg font-semibold text-ink">{item.title}</p>
+                  <p className="mt-1 max-w-[48ch] text-base text-body">
                     {item.detail}
                   </p>
                 </div>

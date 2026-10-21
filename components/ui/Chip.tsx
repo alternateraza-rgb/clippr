@@ -19,7 +19,7 @@ export function Chip({
       onClick={onClick}
       aria-pressed={selected}
       className={cn(
-        "inline-flex h-9 select-none items-center rounded-[var(--radius-pill)] px-4 text-[13.5px] font-medium",
+        "inline-flex h-9 select-none items-center rounded-full px-4 text-sm font-medium",
         "transition-colors duration-[var(--dur-fast)] ease-[var(--ease-out-soft)] active:scale-[0.98]",
         selected
           ? "bg-ink text-on-brand"
@@ -53,7 +53,7 @@ export function Tag({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-2.5 py-1 text-[11.5px] font-medium",
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-micro font-medium",
         tones[tone],
         className,
       )}

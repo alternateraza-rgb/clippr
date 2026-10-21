@@ -18,9 +18,9 @@ const variants = {
 } as const;
 
 const sizes = {
-  sm: "h-9 px-4 text-[13.5px]",
-  md: "h-11 px-5 text-[14.5px]",
-  lg: "h-[52px] px-7 text-[16px]",
+  sm: "h-9 px-4 text-sm",
+  md: "h-11 px-5 text-base",
+  lg: "h-[52px] px-7 text-lg",
 } as const;
 
 type PillProps = {
@@ -50,7 +50,7 @@ export function Pill({
   icon,
 }: PillProps) {
   const classes = cn(
-    "relative inline-flex select-none items-center justify-center gap-2 rounded-[var(--radius-pill)]",
+    "relative inline-flex select-none items-center justify-center gap-2 rounded-full",
     "font-medium leading-none whitespace-nowrap",
     "transition-[background-color,color,transform,box-shadow] duration-[var(--dur-fast)] ease-[var(--ease-out-soft)]",
     "active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40",

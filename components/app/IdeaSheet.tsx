@@ -72,7 +72,7 @@ export function IdeaSheet({
             aria-label={item.video.title}
             className={cn(
               "relative flex h-full w-full flex-col bg-canvas outline-none",
-              "sm:w-[min(560px,100%)] sm:rounded-l-[var(--radius-panel)] sm:shadow-pop",
+              "sm:w-[min(560px,100%)] sm:rounded-l-panel sm:shadow-pop",
             )}
             initial={reduced ? { opacity: 0 } : { x: "100%" }}
             animate={reduced ? { opacity: 1 } : { x: 0 }}
@@ -118,10 +118,10 @@ function SheetBody({
 
           <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-5">
             <div className="min-w-0">
-              <p className="truncate text-[12.5px] font-medium text-white/70">
+              <p className="truncate text-caption font-medium text-white/70">
                 {item.video.channel}
               </p>
-              <p className="tnum mt-1 text-[12px] text-white/55">
+              <p className="tnum mt-1 text-caption text-white/55">
                 {formatDuration(item.video.durationS)} · {item.estimatedClipCount} cut
                 {item.estimatedClipCount === 1 ? "" : "s"}
               </p>
@@ -141,7 +141,7 @@ function SheetBody({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-        <h2 className="display text-[22px] leading-snug text-ink">{item.video.title}</h2>
+        <h2 className="display text-d2 text-ink">{item.video.title}</h2>
 
         {loading && !preview ? <PreviewSkeleton /> : null}
 
@@ -156,8 +156,8 @@ function SheetBody({
                 </Tag>
               }
             >
-              <p className="text-[15px] leading-relaxed text-body">{preview.angle}</p>
-              <p className="mt-3 text-[14px] leading-relaxed text-muted">{preview.audience}</p>
+              <p className="text-md text-body">{preview.angle}</p>
+              <p className="mt-3 text-base text-muted">{preview.audience}</p>
             </Block>
 
             <Block title="Where to cut">
@@ -168,20 +168,20 @@ function SheetBody({
                       href={`${watchUrl}&t=${moment.at}s`}
                       target="_blank"
                       rel="noreferrer"
-                      className="group flex gap-3.5 rounded-[var(--radius-control)] px-2 py-2.5 transition-colors hover:bg-surface-warm"
+                      className="group flex gap-3.5 rounded-control px-2 py-2.5 transition-colors hover:bg-surface-warm"
                     >
-                      <span className="tnum mt-px shrink-0 rounded-[6px] bg-ink px-2 py-1 text-[11.5px] font-semibold text-on-brand">
+                      <span className="tnum mt-px shrink-0 rounded-[6px] bg-ink px-2 py-1 text-micro font-semibold text-on-brand">
                         {formatTimestamp(moment.at)}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-1.5 text-[14.5px] font-medium text-ink">
+                        <span className="flex items-center gap-1.5 text-base font-medium text-ink">
                           {moment.label}
                           <ArrowUpRight
                             className="h-3.5 w-3.5 shrink-0 text-muted opacity-0 transition-opacity group-hover:opacity-100"
                             strokeWidth={2}
                           />
                         </span>
-                        <span className="mt-1 block text-[13.5px] leading-relaxed text-muted">
+                        <span className="mt-1 block text-sm text-muted">
                           {moment.why}
                         </span>
                       </span>
@@ -209,7 +209,7 @@ function SheetBody({
               </div>
             </Block>
 
-            <p className="rounded-[var(--radius-control)] bg-surface-warm px-4 py-3 text-[13px] leading-relaxed text-muted">
+            <p className="rounded-control bg-surface-warm px-4 py-3 text-sm text-muted">
               {preview.watchOut}
             </p>
           </div>
@@ -271,9 +271,9 @@ function HookRow({ hook }: { hook: string }) {
     <button
       type="button"
       onClick={copy}
-      className="group flex w-full items-center gap-3 rounded-[var(--radius-control)] bg-surface px-4 py-3 text-left shadow-hairline transition-colors hover:bg-surface-warm"
+      className="group flex w-full items-center gap-3 rounded-control bg-surface px-4 py-3 text-left shadow-hairline transition-colors hover:bg-surface-warm"
     >
-      <span className="min-w-0 flex-1 text-[14.5px] leading-snug text-ink">{hook}</span>
+      <span className="min-w-0 flex-1 text-base text-ink">{hook}</span>
       <span className="shrink-0 text-muted transition-colors group-hover:text-ink">
         {copied ? (
           <Check className="h-4 w-4 text-success" strokeWidth={2.2} />
@@ -312,7 +312,7 @@ function PreviewSkeleton() {
           ))}
         </div>
       </div>
-      <p className="flex items-center gap-2 text-[13px] text-muted">
+      <p className="flex items-center gap-2 text-sm text-muted">
         <Sparkles className="h-3.5 w-3.5 animate-pulse text-brand" strokeWidth={2.2} />
         Reading the video for an angle…
       </p>

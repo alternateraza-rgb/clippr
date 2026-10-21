@@ -8,7 +8,7 @@ import { downloadSource } from "./media";
 import { fetchSupadataTranscript } from "../../lib/ingest/supadata";
 import type { TranscriptResult } from "../../lib/agent/transcript";
 import { run } from "./exec";
-import { explodeWords, parseVtt, segmentsFromWords } from "./vtt";
+import { explodeWords, parseVtt, parseVttWords, segmentsFromWords } from "./vtt";
 import { transcribeFile } from "./whisper";
 
 const AUDIO_CAP_S = 10 * 60;
@@ -55,8 +55,17 @@ async function trySubs(dir: string, videoId: string): Promise<TranscriptResult |
   if (!vtt) return null;
   const raw = await readFile(join(dir, vtt), "utf8");
   const segments = parseVtt(raw);
-  const words = explodeWords(segments);
+  // Prefer the timings YouTube already measured. Auto-captions stamp every word
+  // inline; only manually-uploaded subtitles lack them, and those fall back to
+  // spreading each cue across its words by character length — the same guess as
+  // before, now used only where there is nothing better.
+  const stamped = parseVttWords(raw);
+  const words = stamped.length ? stamped : explodeWords(segments);
   if (!words.length) return null;
+  console.info(
+    `[diag] transcript video=${videoId} provider=ytdlp-vtt ` +
+      `wordTimings=${stamped.length ? "real" : "interpolated"} words=${words.length}`,
+  );
   return { segments, words, language: "en", source: "captions" };
 }
 

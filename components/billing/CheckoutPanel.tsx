@@ -46,23 +46,23 @@ export function CheckoutPanel({ name }: { name: string }) {
   return (
     <div className="mx-auto w-full max-w-[440px]">
       <p className="eyebrow text-brand">Last step</p>
-      <h1 className="display mt-3 text-[clamp(30px,5vw,40px)] text-ink">
+      <h1 className="display mt-3 text-d4 text-ink">
         {name ? `You're set up, ${name}.` : "You're set up."}
       </h1>
-      <p className="mt-3 text-[15.5px] leading-relaxed text-body">
+      <p className="mt-3 text-md text-body">
         Your desk is ready. Start your plan and the studio opens.
       </p>
 
-      <div className="mt-8 rounded-[var(--radius-panel)] bg-void p-6 text-white">
+      <div className="mt-8 rounded-panel bg-void p-6 text-white">
         <div className="flex items-baseline gap-2">
-          <span className="display-xl text-[46px] text-white">$150</span>
-          <span className="text-[15px] text-white/55">/ month</span>
+          <span className="display text-d5 text-white">$150</span>
+          <span className="text-md text-white/55">/ month</span>
         </div>
-        <p className="mt-2 text-[14px] text-white/60">Unlimited clips. Cancel any time.</p>
+        <p className="mt-2 text-base text-white/60">Unlimited clips. Cancel any time.</p>
 
         <ul className="mt-6 space-y-2.5">
           {INCLUDED.map((item) => (
-            <li key={item} className="flex gap-2.5 text-[14px] leading-relaxed text-white/85">
+            <li key={item} className="flex gap-2.5 text-base text-white/85">
               <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand" strokeWidth={2.4} />
               {item}
             </li>
@@ -79,12 +79,12 @@ export function CheckoutPanel({ name }: { name: string }) {
           Start my plan
         </Pill>
 
-        <p className="mt-3 text-center text-[12px] text-white/45">
+        <p className="mt-3 text-center text-caption text-white/45">
           Secure checkout by Whop. Card details never touch Clipmuse.
         </p>
       </div>
 
-      {error ? <p className="mt-4 text-[13.5px] text-brand">{error}</p> : null}
+      {error ? <p className="mt-4 text-sm text-brand">{error}</p> : null}
     </div>
   );
 }

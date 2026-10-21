@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { base } from "@/components/motion/presets";
 import { Chip } from "@/components/ui/Chip";
 import { Pill } from "@/components/ui/Pill";
 import { Wordmark } from "@/components/ui/Wordmark";
@@ -86,7 +87,7 @@ export function OnboardingFlow() {
       <div className="mx-auto flex min-h-screen max-w-[720px] flex-col px-6 py-8">
         <div className="flex items-center justify-between">
           <Wordmark />
-          <p className="text-[13px] text-muted">{step + 1} / 4</p>
+          <p className="text-sm text-muted">{step + 1} / 4</p>
         </div>
         <div className="mt-6 h-px bg-surface-warm-alt">
           <div
@@ -147,18 +148,18 @@ export function OnboardingFlow() {
                   </Pill>
                 </div>
                 {picking ? (
-                  <p className="mt-6 text-[14px] text-muted">
+                  <p className="mt-6 text-base text-muted">
                     Scoring supply, competition, and what still pays…
                   </p>
                 ) : null}
                 {picked && !picking ? (
-                  <div className="mt-8 rounded-[20px] bg-surface p-6 shadow-hairline">
+                  <div className="mt-8 rounded-panel bg-surface p-6 shadow-hairline">
                     <p className="eyebrow text-brand">Recommended</p>
-                    <h3 className="display mt-3 text-[26px]">
+                    <h3 className="display mt-3 text-d3">
                       {picked.primary.label}
                     </h3>
                     <p className="mt-2 text-body">{picked.primary.blurb}</p>
-                    <p className="mt-4 text-[13px] text-muted">
+                    <p className="mt-4 text-sm text-muted">
                       Runner-up: {picked.runnerUp.label}. You can still tap any chip above.
                     </p>
                   </div>
@@ -190,17 +191,17 @@ export function OnboardingFlow() {
                 <p className="mt-4 max-w-[40ch] text-body">
                   We&apos;ll stock Home and Ideas for this setup. You can retune anytime.
                 </p>
-                <div className="mt-10 rounded-[20px] bg-surface p-8 shadow-hairline">
+                <div className="mt-10 rounded-panel bg-surface p-8 shadow-hairline">
                   <p className="eyebrow text-brand">
                     {source === "picked" ? "Picked for you" : "Your pick"}
                   </p>
-                  <h3 className="display mt-3 text-[30px]">
+                  <h3 className="display mt-3 text-d3">
                     {NICHES.find((n) => n.id === niche)?.label}
                   </h3>
                   <p className="mt-3 text-body">
                     {platforms.map((p) => PLATFORMS.find((x) => x.id === p)?.label).join(" · ")}
                   </p>
-                  <p className="mt-2 text-[14px] text-muted">
+                  <p className="mt-2 text-base text-muted">
                     {interests
                       .map((id) => FORMATS.find((f) => f.id === id)?.label)
                       .filter(Boolean)
@@ -240,9 +241,9 @@ function Step({ title, children }: { title: string; children: React.ReactNode })
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.35, ease: [0.2, 0.8, 0.2, 1] }}
+      transition={base}
     >
-      <h1 className="display text-[clamp(32px,6vw,48px)]">{title}</h1>
+      <h1 className="display text-d4">{title}</h1>
       {children}
     </motion.div>
   );

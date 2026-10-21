@@ -7,6 +7,7 @@ import { SettingsRow, SettingsSection } from "@/components/app/SettingsSection";
 import { StatTile } from "@/components/app/StatTile";
 import { Chip, Tag } from "@/components/ui/Chip";
 import { Pill } from "@/components/ui/Pill";
+import { TextInput } from "@/components/ui/TextInput";
 import { signOut } from "@/app/auth/actions";
 import { LEGAL_CONTACT } from "@/lib/legal";
 import { FORMATS, NICHES } from "@/lib/fixtures/niches";
@@ -106,7 +107,7 @@ export default function SettingsPage() {
         lede="Your details, your plan, and the defaults every new clip starts from."
       />
 
-      <div className="mt-9 grid gap-px overflow-hidden rounded-[var(--radius-card)] bg-hairline sm:grid-cols-3">
+      <div className="mt-9 grid gap-px overflow-hidden rounded-card bg-hairline sm:grid-cols-3">
         <StatTile value={stats.total} label="Clips created" hint="Finished and downloadable" />
         <StatTile value={stats.thisMonth} label="This month" hint="Since the 1st" />
         <StatTile
@@ -132,8 +133,8 @@ export default function SettingsPage() {
                 <PasswordCard email={account.email} />
               ) : (
                 <div>
-                  <p className="text-[12.5px] text-muted">Password</p>
-                  <p className="mt-0.5 text-[14px] text-body">
+                  <p className="text-caption text-muted">Password</p>
+                  <p className="mt-0.5 text-base text-body">
                     {authEnabled
                       ? "You signed in without a password, so there's nothing to change here."
                       : "Sign in to manage your password."}
@@ -148,11 +149,11 @@ export default function SettingsPage() {
           title="Plan"
           description="Unlimited clips, billed monthly."
         >
-          <div className="rounded-[var(--radius-card)] bg-surface p-5 shadow-hairline">
+          <div className="rounded-card bg-surface p-5 shadow-hairline">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-[16px] font-semibold text-ink">Unlimited</p>
+                  <p className="text-lg font-semibold text-ink">Unlimited</p>
                   {/* Only claimed once billing is wired and the webhook has
                       actually told us. Off, this stays silent rather than
                       asserting a state nothing tracks. */}
@@ -162,11 +163,11 @@ export default function SettingsPage() {
                     </Tag>
                   ) : null}
                 </div>
-                <p className="mt-1.5 text-[14px] text-body">
+                <p className="mt-1.5 text-base text-body">
                   Unlimited generations, the full edit, and your library kept.
                 </p>
                 {billing?.currentPeriodEnd ? (
-                  <p className="mt-1.5 text-[13px] text-muted">
+                  <p className="mt-1.5 text-sm text-muted">
                     {billing.status === "canceling" ? "Access until " : "Renews "}
                     {new Date(billing.currentPeriodEnd).toLocaleDateString("en-GB", {
                       day: "numeric",
@@ -176,12 +177,12 @@ export default function SettingsPage() {
                   </p>
                 ) : null}
               </div>
-              <p className="display shrink-0 text-[26px] text-ink">
+              <p className="display shrink-0 text-d3 text-ink">
                 $150
-                <span className="text-[14px] font-normal text-muted"> / mo</span>
+                <span className="text-base font-normal text-muted"> / mo</span>
               </p>
             </div>
-            <p className="mt-5 border-t border-hairline pt-4 text-[13.5px] leading-relaxed text-muted">
+            <p className="mt-5 border-t border-hairline pt-4 text-sm text-muted">
               To change or cancel your plan, email{" "}
               <a
                 href={`mailto:${LEGAL_CONTACT}`}
@@ -199,12 +200,12 @@ export default function SettingsPage() {
           title="Profile"
           description="The name we greet you with."
         >
-          <input
+          <TextInput
             value={profile.displayName}
             onChange={(e) => setProfile({ ...profile, displayName: e.target.value })}
             placeholder="Your name"
             aria-label="Display name"
-            className="w-full max-w-[340px] rounded-[var(--radius-control)] bg-surface px-4 py-3 text-[15px] text-ink outline-none shadow-[inset_0_0_0_1px_var(--color-hairline)] transition-shadow placeholder:text-muted focus:shadow-[inset_0_0_0_1.5px_var(--color-ink)]"
+            className="max-w-[340px]"
           />
         </SettingsSection>
 
@@ -324,7 +325,7 @@ function ChoiceRow({
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
-      className={`flex w-full items-start gap-3 rounded-[var(--radius-control)] px-4 py-3 text-left transition-colors duration-[var(--dur-fast)] ${
+      className={`flex w-full items-start gap-3 rounded-control px-4 py-3 text-left transition-colors duration-[var(--dur-fast)] ${
         selected
           ? "bg-surface shadow-[inset_0_0_0_1.5px_var(--color-ink)]"
           : "bg-surface shadow-[inset_0_0_0_1px_var(--color-hairline)] hover:bg-surface-warm"
@@ -338,8 +339,8 @@ function ChoiceRow({
         {selected ? <span className="h-[5px] w-[5px] rounded-full bg-canvas" /> : null}
       </span>
       <span className="min-w-0">
-        <span className="block text-[14.5px] font-medium text-ink">{label}</span>
-        <span className="mt-0.5 block text-[13px] leading-relaxed text-muted">{detail}</span>
+        <span className="block text-base font-medium text-ink">{label}</span>
+        <span className="mt-0.5 block text-sm text-muted">{detail}</span>
       </span>
     </button>
   );

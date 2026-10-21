@@ -16,7 +16,7 @@ export function LandingFooter() {
     <footer className="bg-void px-6 text-white">
       <div className="mx-auto max-w-[1120px]">
         <div className="flex flex-col items-start gap-8 py-20 md:flex-row md:items-end md:justify-between md:py-24">
-          <h2 className="display max-w-[14ch] text-[clamp(32px,5.4vw,58px)] text-white">
+          <h2 className="display max-w-[14ch] text-d5 text-white">
             One link is all it takes.
           </h2>
           <StartCta size="lg" />
@@ -26,7 +26,7 @@ export function LandingFooter() {
 
         <div className="flex flex-col gap-8 py-10 md:flex-row md:items-center md:justify-between">
           <Wordmark tone="on-dark" size={20} />
-          <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13.5px] text-white/60">
+          <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/60">
             {LEGAL.map((item) => (
               <Link key={item.href} href={item.href} className="transition-colors hover:text-white">
                 {item.label}
@@ -35,7 +35,7 @@ export function LandingFooter() {
           </nav>
         </div>
 
-        <div className="flex flex-col gap-2 border-t border-void-line py-8 text-[12.5px] text-white/45 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2 border-t border-void-line py-8 text-caption text-white/45 sm:flex-row sm:items-center sm:justify-between">
           <p>Built for anyone who wants to make money online.</p>
           <p>© {new Date().getFullYear()} Clipmuse</p>
         </div>

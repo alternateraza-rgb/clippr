@@ -39,6 +39,7 @@ Also return:
 - topic: what this video is about, one specific line, written as something a viewer would understand
 - hook: the verbatim opening words of the FIRST segment — what the clip cold-opens on
 - whyItClips: two sentences on why this topic is worth a short video and why these moments tell it. Specific to this tape. Never generic boilerplate that could describe any clip.
+- genre: which ONE of these the finished clip belongs to, judged by what the clip itself is about rather than the niche named above: finance, true-crime, podcasts, sports, fitness, faith, comedy, tech, politics, storytime, self-improvement, gaming
 
 Score the assembled clip 0-100 on:
 - hook: does the first 1-2 seconds stop the scroll on its own, with no context?
@@ -50,4 +51,4 @@ Score the assembled clip 0-100 on:
 Return exactly one clip. Score it honestly: if the tape is weak, say so in the scores rather than inflating them.
 
 Respond with JSON:
-{"topic":"","hook":"","whyItClips":"","scores":{"hook":0,"emotion":0,"selfContained":0,"quotability":0,"payoff":0},"segments":[{"start":0,"end":0,"startQuote":"","endQuote":"","role":"setup"}]}`;
+{"topic":"","hook":"","whyItClips":"","genre":"","scores":{"hook":0,"emotion":0,"selfContained":0,"quotability":0,"payoff":0},"segments":[{"start":0,"end":0,"startQuote":"","endQuote":"","role":"setup"}]}`;

@@ -28,22 +28,22 @@ export function BeforeYouPost({ className }: { className?: string }) {
     <section className={cn("text-left", className)}>
       <h2 className="eyebrow text-ink">Before you post</h2>
 
-      <div className="mt-3.5 divide-y divide-hairline overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-hairline">
+      <div className="mt-3.5 divide-y divide-hairline overflow-hidden rounded-card bg-surface shadow-hairline">
         {GUIDANCE.map((item) => (
           <div
             key={item.platform}
             className="grid gap-1 p-4 sm:grid-cols-[136px_1fr] sm:gap-5 sm:p-5"
           >
-            <p className="text-[13.5px] font-semibold text-ink">{item.platform}</p>
+            <p className="text-sm font-semibold text-ink">{item.platform}</p>
             <div className="min-w-0">
-              <p className="text-[14.5px] text-ink">{item.action}</p>
-              <p className="mt-1 text-[13px] leading-relaxed text-muted">{item.why}</p>
+              <p className="text-base text-ink">{item.action}</p>
+              <p className="mt-1 text-sm text-muted">{item.why}</p>
             </div>
           </div>
         ))}
       </div>
 
-      <p className="mt-3 text-[12.5px] leading-relaxed text-muted">
+      <p className="mt-3 text-caption text-muted">
         On a business or professional account, pick from the platform&apos;s commercial
         music library — the general catalogue isn&apos;t always cleared for commercial use.
       </p>

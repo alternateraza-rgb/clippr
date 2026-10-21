@@ -6,6 +6,7 @@ import { IdeaCard } from "@/components/app/IdeaCard";
 import { IdeaSheet } from "@/components/app/IdeaSheet";
 import { PageHeader } from "@/components/app/PageHeader";
 import { Chip } from "@/components/ui/Chip";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Pill } from "@/components/ui/Pill";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { nicheById } from "@/lib/fixtures/niches";
@@ -73,7 +74,7 @@ export default function IdeasPage() {
           </Chip>
         ))}
         {!loading && items.length ? (
-          <p className="tnum ml-auto text-[13px] text-muted">
+          <p className="tnum ml-auto text-sm text-muted">
             {items.length} video{items.length === 1 ? "" : "s"}
           </p>
         ) : null}
@@ -86,16 +87,15 @@ export default function IdeasPage() {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="mt-10 rounded-[var(--radius-card)] bg-surface p-10 text-center shadow-hairline">
-          <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-brand-soft">
-            <Sparkles className="h-5 w-5 text-brand" strokeWidth={2} />
-          </span>
-          <p className="mx-auto mt-4 max-w-[44ch] text-[15px] leading-relaxed text-body">
-            {live
+        <EmptyState
+          className="mt-10"
+          icon={Sparkles}
+          body={
+            live
               ? "Quiet day in this niche — or the feed hasn't been built yet. A thin day is a real day; we don't invent volume."
-              : "Quiet day. Come back tomorrow, or paste your own link from Home."}
-          </p>
-          <div className="mt-5">
+              : "Quiet day. Come back tomorrow, or paste your own link from Home."
+          }
+          action={
             <Pill
               onClick={restock}
               loading={stocking}
@@ -103,8 +103,8 @@ export default function IdeasPage() {
             >
               {stocking ? "Researching…" : "Research this niche"}
             </Pill>
-          </div>
-        </div>
+          }
+        />
       ) : (
         <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {items.map((item) => (

@@ -1,4 +1,5 @@
 import { RUBRIC_VERSION, hasLlm } from "@/lib/config";
+import { asGenre } from "@/lib/fixtures/niches";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { deleteR2Objects, presignR2Url, type StorageProvider } from "@/lib/storage/r2";
 import { createClient } from "@/lib/supabase/server";
@@ -79,6 +80,22 @@ export async function writeVideoCache(video: VideoMeta): Promise<void> {
   });
 }
 
+/**
+ * A transcript whose whole runtime is one or two segments never came from a
+ * caption track — it is the fabricated timeline Supadata's plain-text branch
+ * used to return, with every word interpolated linearly across the tape.
+ *
+ * `transcript_cache` is keyed on `video_id` alone, with no version and no
+ * provenance, so a row written once is served forever. Rejecting on the shape
+ * is what retires those rows without a schema change: the read misses, and the
+ * video is re-fetched through a provider that has real timings.
+ */
+function fabricated(segments: { start?: number; end?: number }[]): boolean {
+  if (segments.length > 2) return false;
+  const coverage = segments.reduce((max, s) => Math.max(max, Number(s?.end) || 0), 0);
+  return coverage > 120;
+}
+
 export async function readTranscriptCache(videoId: string): Promise<TranscriptResult | null> {
   const supabase = await createClient();
   if (!supabase) return null;
@@ -92,6 +109,10 @@ export async function readTranscriptCache(videoId: string): Promise<TranscriptRe
   const words = data.words ?? [];
   const segments = data.segments ?? [];
   if (!words.length) return null;
+  if (fabricated(segments)) {
+    console.warn(`[transcript] ${videoId}: cached timeline is fabricated — refetching`);
+    return null;
+  }
   return {
     segments,
     words,
@@ -103,6 +124,11 @@ export async function readTranscriptCache(videoId: string): Promise<TranscriptRe
 export async function writeTranscriptCache(videoId: string, transcript: TranscriptResult): Promise<void> {
   const supabase = await writeClient();
   if (!supabase) return;
+  // Refuse to persist what the read would reject on the way back out.
+  if (fabricated(transcript.segments)) {
+    console.warn(`[transcript] ${videoId}: refusing to cache a fabricated timeline`);
+    return;
+  }
   await supabase.from("transcript_cache").upsert({
     video_id: videoId,
     language: transcript.language,
@@ -320,23 +346,30 @@ export async function insertClipRender(input: {
 }): Promise<string | null> {
   const supabase = await writeClient();
   if (!supabase) return null;
-  const { data, error } = await supabase
-    .from("clip_renders")
-    .insert({
-      user_id: input.userId,
-      video_id: input.videoId,
-      job_id: input.jobId ?? null,
-      status: "queued",
-      progress: 0,
-      start_s: input.start,
-      end_s: input.end,
-      gameplay: input.gameplay ?? "none",
-      caption_preset: input.captionPreset ?? "hormozi",
-      caption_lines: input.captionLines ?? [],
-      moment: input.moment ?? null,
-    })
-    .select("id")
-    .single();
+  const row = {
+    user_id: input.userId,
+    video_id: input.videoId,
+    job_id: input.jobId ?? null,
+    status: "queued",
+    progress: 0,
+    start_s: input.start,
+    end_s: input.end,
+    gameplay: input.gameplay ?? "none",
+    caption_preset: input.captionPreset ?? "hormozi",
+    caption_lines: input.captionLines ?? [],
+    moment: input.moment ?? null,
+    // Null when the candidate came from an analysis cached before genres
+    // existed; Stats classifies those the first time it sees them.
+    genre: asGenre(input.moment?.genre) ?? null,
+  };
+  const insert = (values: Record<string, unknown>) =>
+    supabase.from("clip_renders").insert(values).select("id").single();
+  let { data, error } = await insert(row);
+  // A database that hasn't had 009 applied has no genre column. Losing the
+  // genre is fine — Stats sorts it later — losing the render is not.
+  if (error && /genre/.test(error.message)) {
+    ({ data, error } = await insert({ ...row, genre: undefined }));
+  }
   if (error || !data) return null;
   return data.id as string;
 }
@@ -356,6 +389,7 @@ function asRender(row: {
   finished_at?: string | null;
   moment?: ClipCandidate | null;
   storage?: string | null;
+  genre?: string | null;
 }): ClipRender {
   return {
     id: row.id,
@@ -376,6 +410,7 @@ function asRender(row: {
     topic: row.moment?.topic,
     why: row.moment?.whyItClips,
     segmentCount: row.moment?.segments?.length,
+    genre: asGenre(row.genre) ?? null,
     storage: (row.storage as StorageProvider) ?? "supabase",
   };
 }

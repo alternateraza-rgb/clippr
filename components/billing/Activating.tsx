@@ -85,7 +85,7 @@ export function Activating() {
         )}
       </span>
 
-      <h1 className="display mt-6 text-[28px] text-ink">
+      <h1 className="display mt-6 text-d3 text-ink">
         {state === "ready"
           ? "You're in."
           : state === "slow"
@@ -93,7 +93,7 @@ export function Activating() {
             : "Setting up your account"}
       </h1>
 
-      <p className="mt-3 text-[15px] leading-relaxed text-body">
+      <p className="mt-3 text-md text-body">
         {state === "ready"
           ? "Opening the studio."
           : state === "slow"
@@ -114,7 +114,7 @@ export function Activating() {
           </Pill>
           <a
             href={`mailto:${LEGAL_CONTACT}`}
-            className="text-[13.5px] text-body underline-offset-4 hover:text-ink hover:underline"
+            className="text-sm text-body underline-offset-4 hover:text-ink hover:underline"
           >
             Still stuck? Email {LEGAL_CONTACT}
           </a>

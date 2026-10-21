@@ -15,7 +15,8 @@
     "service:logs": "tail -f ~/Library/Logs/clipmuse/com.clipmuse.*.log",
     "whop:plans": "tsx scripts/whop-plans.ts",
     "whop:checkout": "tsx scripts/whop-checkout.ts",
-    "whop:testcode": "tsx scripts/whop-testcode.ts"
+    "whop:testcode": "tsx scripts/whop-testcode.ts",
+    "stats:genres": "tsx scripts/backfill-genres.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1119.0",
@@ -23,12 +24,14 @@
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.3",
     "@whop/sdk": "^1.0.14",
+    "clsx": "^2.1.1",
     "framer-motion": "^13.1.0",
     "lenis": "^1.3.26",
     "lucide-react": "^1.31.0",
     "next": "16.3.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "tailwind-merge": "^3.6.0",
     "tsx": "^4.23.12",
     "youtube-caption-extractor": "^1.10.2"
   },

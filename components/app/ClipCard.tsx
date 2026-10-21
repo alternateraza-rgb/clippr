@@ -67,19 +67,20 @@ export function ClipCard({
       exit={
         reduced
           ? { opacity: 0 }
-          : { opacity: 0, scale: 0.9, filter: "blur(4px)", transition: { duration: 0.24 } }
+          : { opacity: 0, scale: 0.9, filter: "blur(4px)", transition: base }
       }
       onMouseEnter={() => preview(true)}
       onMouseLeave={() => preview(false)}
       onClick={onOpen}
-      whileHover={reduced ? undefined : { y: -4 }}
       transition={base}
       className="group cursor-pointer"
     >
-      <div
+      <motion.div
+        layoutId={`clip-${render.id}`}
+        style={{ borderRadius: "var(--radius-card)" }}
         className={cn(
-          "relative aspect-[9/16] overflow-hidden rounded-[var(--radius-card)] bg-ink",
-          "shadow-hairline transition-shadow duration-[var(--dur-base)] group-hover:shadow-lift",
+          "relative aspect-[9/16] overflow-hidden bg-ink",
+          "shadow-hairline transition-shadow duration-[var(--dur-base)] group-hover:shadow-hairline-strong",
         )}
       >
         <video
@@ -92,7 +93,11 @@ export function ClipCard({
           loop
           playsInline
           preload="metadata"
-          className="h-full w-full object-cover"
+          className={cn(
+            "h-full w-full object-cover",
+            "transition-transform duration-[var(--dur-slow)] ease-[var(--ease-out-soft)]",
+            "group-hover:scale-[1.04]",
+          )}
         />
 
         <div
@@ -111,7 +116,7 @@ export function ClipCard({
         ) : null}
 
         {length ? (
-          <span className="tnum absolute right-2.5 top-2.5 rounded-full bg-ink/70 px-2 py-0.5 text-[11px] text-on-brand backdrop-blur-sm">
+          <span className="tnum absolute right-2.5 top-2.5 rounded-full bg-ink/70 px-2 py-0.5 text-micro text-on-brand backdrop-blur-sm">
             {length}
           </span>
         ) : null}
@@ -149,13 +154,13 @@ export function ClipCard({
         </div>
 
         <div className="absolute inset-x-0 bottom-0 p-3.5">
-          <p className="line-clamp-2 text-[13.5px] font-medium leading-snug text-on-brand">
+          <p className="line-clamp-2 text-sm font-medium text-on-brand">
             {render.topic || render.hook || "Untitled clip"}
           </p>
         </div>
-      </div>
+      </motion.div>
 
-      <p className="mt-2.5 px-0.5 text-[12px] text-muted">
+      <p className="mt-2.5 px-0.5 text-caption text-muted">
         {formatRelativeDate(render.createdAt)}
         {render.segmentCount && render.segmentCount > 1
           ? ` · ${render.segmentCount} moments`

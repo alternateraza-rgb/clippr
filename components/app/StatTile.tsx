@@ -17,9 +17,9 @@ export function StatTile({
 }) {
   return (
     <div className={cn("bg-surface px-5 py-5", className)}>
-      <p className="display tnum text-[28px] text-ink">{value}</p>
-      <p className="mt-1.5 text-[13px] font-medium text-ink">{label}</p>
-      {hint ? <p className="mt-0.5 text-[12.5px] text-muted">{hint}</p> : null}
+      <p className="display tnum text-d3 text-ink">{value}</p>
+      <p className="mt-1.5 text-sm font-medium text-ink">{label}</p>
+      {hint ? <p className="mt-0.5 text-caption text-muted">{hint}</p> : null}
     </div>
   );
 }

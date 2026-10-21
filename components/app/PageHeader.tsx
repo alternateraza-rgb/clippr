@@ -22,9 +22,9 @@ export function PageHeader({
     <header className={cn("flex flex-wrap items-end justify-between gap-x-6 gap-y-4", className)}>
       <div className="min-w-0">
         {eyebrow ? <p className="eyebrow text-brand">{eyebrow}</p> : null}
-        <h1 className="display mt-2.5 text-[clamp(26px,3.4vw,38px)] text-ink">{title}</h1>
+        <h1 className="display mt-2.5 text-d4 text-ink">{title}</h1>
         {lede ? (
-          <p className="mt-3 max-w-[56ch] text-[15px] leading-relaxed text-body">{lede}</p>
+          <p className="mt-3 max-w-[56ch] text-md text-body">{lede}</p>
         ) : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}

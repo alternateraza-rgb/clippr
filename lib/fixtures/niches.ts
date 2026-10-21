@@ -134,3 +134,13 @@ export function pickForMe() {
   });
   return { primary: ranked[0], runnerUp: ranked[1] };
 }
+
+/** The niche ids, in catalog order — the closed set a reel's genre is drawn from. */
+export const GENRE_IDS = NICHES.map((n) => n.id);
+
+/** A genre the model or the database handed us, or undefined if it isn't one. */
+export function asGenre(value: unknown): Niche | undefined {
+  return typeof value === "string" && (GENRE_IDS as string[]).includes(value)
+    ? (value as Niche)
+    : undefined;
+}

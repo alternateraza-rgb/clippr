@@ -2,22 +2,31 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FolderOpen, Home, type LucideIcon, Scissors, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
+import { BarChart3, Coins, FolderOpen, Home, type LucideIcon, Scissors, Sparkles } from "lucide-react";
 import { PageTransition } from "@/components/motion/PageTransition";
+import { usePrefersReducedMotion } from "@/components/motion/usePrefersReducedMotion";
 import { Wordmark } from "@/components/ui/Wordmark";
 import { useProfile } from "@/lib/store/profile";
 import { cn } from "@/lib/cn";
 
-const NAV: { href: string; label: string; icon: LucideIcon }[] = [
+/** `short` is the tab-bar label: six full names don't fit across a phone. */
+const NAV: { href: string; label: string; short?: string; icon: LucideIcon }[] = [
   { href: "/app", label: "Home", icon: Home },
   { href: "/app/ideas", label: "Ideas", icon: Sparkles },
   { href: "/app/studio", label: "Studio", icon: Scissors },
   { href: "/app/library", label: "Library", icon: FolderOpen },
+  { href: "/app/stats", label: "Stats", icon: BarChart3 },
+  { href: "/app/rewards", label: "Content Rewards", short: "Rewards", icon: Coins },
 ];
+
+/** Stiff enough to arrive with the page, soft enough to read as travel. */
+const navSpring = { type: "spring", stiffness: 520, damping: 40, mass: 0.8 } as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { profile } = useProfile();
+  const reduced = usePrefersReducedMotion();
   const initial = (profile.displayName || "C").slice(0, 1).toUpperCase();
 
   const isActive = (href: string) =>
@@ -30,7 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Wordmark href="/app" size={18} />
         <Link
           href="/app/settings"
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-[12px] font-semibold text-on-brand"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-caption font-semibold text-on-brand"
           aria-label="Settings"
         >
           {initial}
@@ -52,18 +61,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-[var(--radius-control)] px-3 py-2.5 text-[14px]",
+                  "relative flex items-center gap-2.5 rounded-control px-3 py-2.5 text-base font-medium",
                   "transition-colors duration-[var(--dur-fast)]",
-                  active
-                    ? "bg-ink font-medium text-on-brand"
-                    : "font-medium text-body hover:bg-surface-warm hover:text-ink",
+                  active ? "text-on-brand" : "text-body hover:bg-surface-warm hover:text-ink",
                 )}
               >
+                {/* One indicator for the whole nav, so moving between pages
+                    slides it there instead of blinking it out and in. */}
+                {active ? (
+                  <motion.span
+                    layoutId="nav-active"
+                    transition={reduced ? { duration: 0 } : navSpring}
+                    className="absolute inset-0 rounded-control bg-ink"
+                  />
+                ) : null}
                 <Icon
-                  className={cn("h-[17px] w-[17px]", active ? "text-on-brand" : "text-muted")}
+                  className={cn(
+                    "relative h-[17px] w-[17px]",
+                    active ? "text-on-brand" : "text-muted",
+                  )}
                   strokeWidth={2}
                 />
-                {item.label}
+                <span className="relative">{item.label}</span>
               </Link>
             );
           })}
@@ -73,13 +92,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link
             href="/app/settings"
             className={cn(
-              "flex items-center gap-2.5 rounded-[var(--radius-control)] px-3 py-2.5 text-[14px] transition-colors duration-[var(--dur-fast)]",
+              "flex items-center gap-2.5 rounded-control px-3 py-2.5 text-base transition-colors duration-[var(--dur-fast)]",
               isActive("/app/settings")
                 ? "bg-surface-warm font-medium text-ink"
                 : "text-body hover:bg-surface-warm hover:text-ink",
             )}
           >
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink text-[10.5px] font-semibold text-on-brand">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink text-micro font-semibold text-on-brand">
               {initial}
             </span>
             <span className="truncate">{profile.displayName || "Settings"}</span>
@@ -103,12 +122,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex flex-col items-center gap-1 rounded-[10px] px-3 py-1.5 text-[11px] font-medium transition-colors",
+                  "relative flex flex-col items-center gap-1 rounded-control px-2 py-1.5",
+                  "text-micro font-medium transition-colors duration-[var(--dur-fast)]",
                   active ? "text-brand" : "text-muted",
                 )}
               >
+                {/* The same trick as the sidebar: one mark that travels. */}
+                {active ? (
+                  <motion.span
+                    layoutId="tab-active"
+                    transition={reduced ? { duration: 0 } : navSpring}
+                    className="absolute inset-x-2 -top-px h-[2px] rounded-full bg-brand"
+                  />
+                ) : null}
                 <Icon className="h-[19px] w-[19px]" strokeWidth={2} />
-                {item.label}
+                {item.short ?? item.label}
               </Link>
             );
           })}

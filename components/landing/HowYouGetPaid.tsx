@@ -34,11 +34,11 @@ export function HowYouGetPaid() {
         {PATHS.map((path) => (
           <article
             key={path.n}
-            className="flex h-full flex-col rounded-[var(--radius-card)] bg-surface-warm p-7"
+            className="flex h-full flex-col rounded-card bg-surface-warm p-7"
           >
-            <span className="tnum text-[12.5px] font-semibold text-brand">{path.n}</span>
-            <h3 className="display mt-4 text-[21px] text-ink">{path.title}</h3>
-            <p className="mt-3 text-[15px] leading-relaxed text-body">{path.body}</p>
+            <span className="tnum text-caption font-semibold text-brand">{path.n}</span>
+            <h3 className="display mt-4 text-d1 text-ink">{path.title}</h3>
+            <p className="mt-3 text-md text-body">{path.body}</p>
           </article>
         ))}
       </Reveal>

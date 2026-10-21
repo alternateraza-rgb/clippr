@@ -1,23 +1,40 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Film, RotateCw, X } from "lucide-react";
 import { ClipCard } from "@/components/app/ClipCard";
 import { BeforeYouPost } from "@/components/app/BeforeYouPost";
 import { ClipLightbox } from "@/components/app/ClipLightbox";
 import { PageHeader } from "@/components/app/PageHeader";
+import { Card } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Pill } from "@/components/ui/Pill";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { stagger } from "@/components/motion/presets";
+import { asGenre, nicheById } from "@/lib/fixtures/niches";
 import { useRenders } from "@/lib/hooks/useRenders";
 import type { ClipRender } from "@/lib/agent/types";
 
 type Clip = ClipRender & { posterUrl?: string | null };
 
 export default function LibraryPage() {
+  // The genre filter reads the URL, which can't be known while prerendering.
+  return (
+    <Suspense fallback={null}>
+      <Library />
+    </Suspense>
+  );
+}
+
+function Library() {
   const { renders, loading, remove } = useRenders();
+  // Arrives from a genre row on Stats. Not a control on this page: Library is
+  // for getting at clips, and a filter bar would be one more thing above them.
+  const genre = asGenre(useSearchParams().get("genre"));
   const [open, setOpen] = useState<Clip | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Clip | null>(null);
@@ -44,12 +61,14 @@ export default function LibraryPage() {
   const { clips, working, failed } = useMemo(() => {
     const list = renders as Clip[];
     return {
-      clips: list.filter((r) => r.status === "ready" && r.downloadUrl),
+      clips: list.filter(
+        (r) => r.status === "ready" && r.downloadUrl && (!genre || r.genre === genre),
+      ),
       working: list.filter((r) => r.status !== "ready" && r.status !== "failed"),
       // Failures stay out of the grid entirely — they were the clutter.
       failed: list.filter((r) => r.status === "failed"),
     };
-  }, [renders]);
+  }, [renders, genre]);
 
   return (
     <div>
@@ -59,24 +78,42 @@ export default function LibraryPage() {
         lede="Every finished clip lands here and downloads itself. Hover to preview, click to watch."
         action={
           clips.length ? (
-            <p className="tnum text-[13px] text-muted">
+            <p className="tnum text-sm text-muted">
               {clips.length} clip{clips.length === 1 ? "" : "s"}
             </p>
           ) : null
         }
       />
 
+      {genre ? (
+        <div className="mt-6 flex items-center gap-2">
+          <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-ink pl-3.5 pr-1.5 text-sm font-medium text-on-brand">
+            {nicheById(genre).label}
+            <Link
+              href="/app/library"
+              aria-label="Show every genre"
+              className="flex h-5 w-5 items-center justify-center rounded-full transition-colors hover:bg-white/15"
+            >
+              <X className="h-3.5 w-3.5" strokeWidth={2.2} />
+            </Link>
+          </span>
+          <Link href="/app/stats/genres" className="text-sm text-body transition-colors hover:text-ink">
+            All genres
+          </Link>
+        </div>
+      ) : null}
+
       {working.length ? (
-        <div className="mt-8 flex items-center gap-3 rounded-[var(--radius-card)] bg-surface px-5 py-4 shadow-hairline">
+        <Card padding="none" className="mt-8 flex items-center gap-3 px-5 py-4">
           <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-60" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-brand" />
           </span>
-          <p className="text-[14px] text-ink">
+          <p className="text-base text-ink">
             {working.length} clip{working.length === 1 ? "" : "s"} still rendering
           </p>
-          <p className="text-[13px] text-muted">They appear here on their own.</p>
-        </div>
+          <p className="text-sm text-muted">They appear here on their own.</p>
+        </Card>
       ) : null}
 
       {loading && !clips.length ? (
@@ -109,15 +146,22 @@ export default function LibraryPage() {
             ))}
           </AnimatePresence>
         </motion.div>
+      ) : !loading && genre ? (
+        <EmptyState
+          className="mt-12"
+          title={`No ${nicheById(genre).label.toLowerCase()} clips here`}
+          body="Library holds your 40 most recent clips. Older ones in this genre still count on Stats."
+          action={<Pill variant="outline" href="/app/library">Show every clip</Pill>}
+        />
       ) : !loading ? (
-        <EmptyState />
+        <LibraryEmpty />
       ) : null}
 
       {/* Failures are quiet, not silent: one line, dismissible. A clip that
           died with no trace at all just looks like the app lost it. */}
       {failed.length && !dismissed ? (
-        <div className="mt-10 flex items-center gap-3 rounded-[var(--radius-control)] bg-surface-warm px-4 py-3">
-          <p className="flex-1 text-[13px] text-body">
+        <div className="mt-10 flex items-center gap-3 rounded-control bg-surface-warm px-4 py-3">
+          <p className="flex-1 text-sm text-body">
             {failed.length} clip{failed.length === 1 ? "" : "s"} didn&apos;t finish.
           </p>
           <Pill variant="text" href="/app/studio">
@@ -167,20 +211,14 @@ export default function LibraryPage() {
   );
 }
 
-function EmptyState() {
+function LibraryEmpty() {
   return (
-    <div className="mt-12 flex flex-col items-center rounded-[var(--radius-panel)] bg-surface px-6 py-16 text-center shadow-hairline">
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-warm">
-        <Film className="h-6 w-6 text-brand" strokeWidth={1.5} />
-      </span>
-      <p className="display mt-5 text-[20px] text-ink">Nothing cut yet</p>
-      <p className="mt-2 max-w-[34ch] text-[14px] text-body">
-        Paste a longform video in Studio and the first clip lands here in a
-        couple of minutes.
-      </p>
-      <Pill className="mt-6" href="/app/studio">
-        Open Studio
-      </Pill>
-    </div>
+    <EmptyState
+      className="mt-12"
+      icon={Film}
+      title="Nothing cut yet"
+      body="Paste a longform video in Studio and the first clip lands here in a couple of minutes."
+      action={<Pill href="/app/studio">Open Studio</Pill>}
+    />
   );
 }

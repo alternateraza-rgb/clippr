@@ -1,6 +1,6 @@
 // v2: story assembly. Bumping this invalidates every cached single-window
 // analysis, which would otherwise come back with no segments.
-export const RUBRIC_VERSION = "v2";
+export const RUBRIC_VERSION = "v3";
 
 /**
  * Values that mean "not actually configured" even though something is there.

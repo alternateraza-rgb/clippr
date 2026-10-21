@@ -23,8 +23,8 @@ export function AuthShell({
 
       <div className="flex flex-1 items-center justify-center px-6 py-14">
         <div className="w-full max-w-[400px]">
-          <h1 className="display text-[clamp(32px,5vw,42px)] text-ink">{title}</h1>
-          <p className="mt-3 text-[15.5px] leading-relaxed text-body">{subtitle}</p>
+          <h1 className="display text-d4 text-ink">{title}</h1>
+          <p className="mt-3 text-md text-body">{subtitle}</p>
           {children}
         </div>
       </div>

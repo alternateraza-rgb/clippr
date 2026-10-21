@@ -6,6 +6,7 @@ import { Pill } from "@/components/ui/Pill";
 import { ScoreBar, ScoreRing } from "@/components/ui/ScoreRing";
 import { Tag } from "@/components/ui/Chip";
 import { usePrefersReducedMotion } from "@/components/motion/usePrefersReducedMotion";
+import { base, fast } from "@/components/motion/presets";
 import { formatTimestamp } from "@/lib/format";
 import { thumbnailFor } from "@/lib/youtube";
 import type { ClipCandidate } from "@/lib/agent/types";
@@ -50,8 +51,8 @@ export function ClipProposal({
       key={candidate.id}
       initial={reduced ? { opacity: 0 } : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: reduced ? 0.15 : 0.4, ease: [0.2, 0.8, 0.2, 1] }}
-      className="overflow-hidden rounded-[var(--radius-panel)] bg-surface shadow-hairline"
+      transition={reduced ? fast : base}
+      className="overflow-hidden rounded-panel bg-surface shadow-hairline"
     >
       <div className="relative aspect-[16/7] overflow-hidden bg-void">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -68,7 +69,7 @@ export function ClipProposal({
               <Sparkles className="h-3 w-3" strokeWidth={2.2} />
               {attempt === 1 ? "Clipmuse picked this" : `Idea ${attempt}`}
             </Tag>
-            <p className="tnum mt-2.5 flex items-center gap-1.5 text-[12.5px] text-white/70">
+            <p className="tnum mt-2.5 flex items-center gap-1.5 text-caption text-white/70">
               <Clock className="h-3.5 w-3.5" strokeWidth={2} />
               {formatTimestamp(candidate.start)} – {formatTimestamp(candidate.end)}
               <span className="text-white/40">·</span>
@@ -81,17 +82,17 @@ export function ClipProposal({
 
       <div className="p-6">
         {candidate.topic ? (
-          <h2 className="display text-[22px] leading-snug text-ink">{candidate.topic}</h2>
+          <h2 className="display text-d2 text-ink">{candidate.topic}</h2>
         ) : null}
 
         {candidate.hook ? (
-          <p className="mt-2.5 text-[15.5px] leading-relaxed text-ink">
+          <p className="mt-2.5 text-md text-ink">
             &ldquo;{candidate.hook}&rdquo;
           </p>
         ) : null}
 
         {candidate.whyItClips ? (
-          <p className="mt-3 text-[14.5px] leading-relaxed text-body">{candidate.whyItClips}</p>
+          <p className="mt-3 text-base text-body">{candidate.whyItClips}</p>
         ) : null}
 
         {segments.length > 1 ? (
@@ -103,16 +104,16 @@ export function ClipProposal({
               {segments.map((segment, i) => (
                 <li
                   key={`${segment.start}-${i}`}
-                  className="flex items-start gap-3 rounded-[var(--radius-control)] bg-surface-warm px-3.5 py-2.5"
+                  className="flex items-start gap-3 rounded-control bg-surface-warm px-3.5 py-2.5"
                 >
-                  <span className="tnum mt-px shrink-0 text-[11.5px] font-semibold text-brand">
+                  <span className="tnum mt-px shrink-0 text-micro font-semibold text-brand">
                     {formatTimestamp(segment.start)}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[12px] font-medium uppercase tracking-[0.06em] text-muted">
+                    <span className="block text-caption font-medium uppercase tracking-[0.06em] text-muted">
                       {ROLE_LABEL[segment.role] ?? segment.role}
                     </span>
-                    <span className="mt-0.5 block truncate text-[13.5px] text-body">
+                    <span className="mt-0.5 block truncate text-sm text-body">
                       {segment.quote}
                     </span>
                   </span>
