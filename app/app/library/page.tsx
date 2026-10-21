@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Film, RotateCw, X } from "lucide-react";
 import { ClipCard } from "@/components/app/ClipCard";
@@ -13,13 +15,26 @@ import { Pill } from "@/components/ui/Pill";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { stagger } from "@/components/motion/presets";
+import { asGenre, nicheById } from "@/lib/fixtures/niches";
 import { useRenders } from "@/lib/hooks/useRenders";
 import type { ClipRender } from "@/lib/agent/types";
 
 type Clip = ClipRender & { posterUrl?: string | null };
 
 export default function LibraryPage() {
+  // The genre filter reads the URL, which can't be known while prerendering.
+  return (
+    <Suspense fallback={null}>
+      <Library />
+    </Suspense>
+  );
+}
+
+function Library() {
   const { renders, loading, remove } = useRenders();
+  // Arrives from a genre row on Stats. Not a control on this page: Library is
+  // for getting at clips, and a filter bar would be one more thing above them.
+  const genre = asGenre(useSearchParams().get("genre"));
   const [open, setOpen] = useState<Clip | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Clip | null>(null);
@@ -46,12 +61,14 @@ export default function LibraryPage() {
   const { clips, working, failed } = useMemo(() => {
     const list = renders as Clip[];
     return {
-      clips: list.filter((r) => r.status === "ready" && r.downloadUrl),
+      clips: list.filter(
+        (r) => r.status === "ready" && r.downloadUrl && (!genre || r.genre === genre),
+      ),
       working: list.filter((r) => r.status !== "ready" && r.status !== "failed"),
       // Failures stay out of the grid entirely — they were the clutter.
       failed: list.filter((r) => r.status === "failed"),
     };
-  }, [renders]);
+  }, [renders, genre]);
 
   return (
     <div>
@@ -67,6 +84,24 @@ export default function LibraryPage() {
           ) : null
         }
       />
+
+      {genre ? (
+        <div className="mt-6 flex items-center gap-2">
+          <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-ink pl-3.5 pr-1.5 text-sm font-medium text-on-brand">
+            {nicheById(genre).label}
+            <Link
+              href="/app/library"
+              aria-label="Show every genre"
+              className="flex h-5 w-5 items-center justify-center rounded-full transition-colors hover:bg-white/15"
+            >
+              <X className="h-3.5 w-3.5" strokeWidth={2.2} />
+            </Link>
+          </span>
+          <Link href="/app/stats/genres" className="text-sm text-body transition-colors hover:text-ink">
+            All genres
+          </Link>
+        </div>
+      ) : null}
 
       {working.length ? (
         <Card padding="none" className="mt-8 flex items-center gap-3 px-5 py-4">
@@ -111,6 +146,13 @@ export default function LibraryPage() {
             ))}
           </AnimatePresence>
         </motion.div>
+      ) : !loading && genre ? (
+        <EmptyState
+          className="mt-12"
+          title={`No ${nicheById(genre).label.toLowerCase()} clips here`}
+          body="Library holds your 40 most recent clips. Older ones in this genre still count on Stats."
+          action={<Pill variant="outline" href="/app/library">Show every clip</Pill>}
+        />
       ) : !loading ? (
         <LibraryEmpty />
       ) : null}

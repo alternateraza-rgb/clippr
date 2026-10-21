@@ -75,6 +75,8 @@ export type ClipCandidate = {
   captionLines: CaptionLine[];
   /** What the clip is about, in the model's words. */
   topic?: string;
+  /** Which of the niche catalog the clip itself belongs to — not the user's niche. */
+  genre?: Niche;
   /**
    * The spans that make up the clip, in the order they play. A single segment
    * spanning start..end is the floor, and is what a one-window clip looks like.
@@ -145,6 +147,8 @@ export type ClipRender = {
   topic?: string;
   why?: string;
   segmentCount?: number;
+  /** Null until the reel has been classified; see lib/stats/genre.ts. */
+  genre?: Niche | null;
   /** Which store holds the file. Older rows predate R2 and say "supabase". */
   storage?: "supabase" | "r2";
 };

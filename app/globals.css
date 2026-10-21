@@ -186,6 +186,26 @@
   --dur-slow: 480ms;
 }
 
+:root {
+  /* Charts. Read through var() in inline styles, so they live here rather
+     than in @theme, which only emits what a utility class uses.
+     Categorical slots are taken in this order and never cycled — a fifth
+     series folds into "other". Validated as a set on white (adjacent
+     CVD ΔE ≥ 9.6); slot 3 is under 3:1, so every chart that uses it also
+     labels its values. */
+  --color-series-1: #ff4a17;
+  --color-series-2: #2a78d6;
+  --color-series-3: #1baf7a;
+  --color-series-4: #6250d6;
+  --color-series-other: #c4c4c4;
+  /* One hue, light to dark, for counts on a calendar. Step 0 is "none". */
+  --color-heat-0: #f0f0f0;
+  --color-heat-1: #ffd3c4;
+  --color-heat-2: #ff9f7d;
+  --color-heat-3: #ff6a3d;
+  --color-heat-4: #c93306;
+}
+
 html {
   background: var(--color-canvas);
   color: var(--color-ink);

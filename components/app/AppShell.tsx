@@ -3,19 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { Coins, FolderOpen, Home, type LucideIcon, Scissors, Sparkles } from "lucide-react";
+import { BarChart3, Coins, FolderOpen, Home, type LucideIcon, Scissors, Sparkles } from "lucide-react";
 import { PageTransition } from "@/components/motion/PageTransition";
 import { usePrefersReducedMotion } from "@/components/motion/usePrefersReducedMotion";
 import { Wordmark } from "@/components/ui/Wordmark";
 import { useProfile } from "@/lib/store/profile";
 import { cn } from "@/lib/cn";
 
-/** `short` is the tab-bar label: five full names don't fit across a phone. */
+/** `short` is the tab-bar label: six full names don't fit across a phone. */
 const NAV: { href: string; label: string; short?: string; icon: LucideIcon }[] = [
   { href: "/app", label: "Home", icon: Home },
   { href: "/app/ideas", label: "Ideas", icon: Sparkles },
   { href: "/app/studio", label: "Studio", icon: Scissors },
   { href: "/app/library", label: "Library", icon: FolderOpen },
+  { href: "/app/stats", label: "Stats", icon: BarChart3 },
   { href: "/app/rewards", label: "Content Rewards", short: "Rewards", icon: Coins },
 ];
 

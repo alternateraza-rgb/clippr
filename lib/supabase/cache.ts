@@ -1,4 +1,5 @@
 import { RUBRIC_VERSION, hasLlm } from "@/lib/config";
+import { asGenre } from "@/lib/fixtures/niches";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { deleteR2Objects, presignR2Url, type StorageProvider } from "@/lib/storage/r2";
 import { createClient } from "@/lib/supabase/server";
@@ -345,23 +346,30 @@ export async function insertClipRender(input: {
 }): Promise<string | null> {
   const supabase = await writeClient();
   if (!supabase) return null;
-  const { data, error } = await supabase
-    .from("clip_renders")
-    .insert({
-      user_id: input.userId,
-      video_id: input.videoId,
-      job_id: input.jobId ?? null,
-      status: "queued",
-      progress: 0,
-      start_s: input.start,
-      end_s: input.end,
-      gameplay: input.gameplay ?? "none",
-      caption_preset: input.captionPreset ?? "hormozi",
-      caption_lines: input.captionLines ?? [],
-      moment: input.moment ?? null,
-    })
-    .select("id")
-    .single();
+  const row = {
+    user_id: input.userId,
+    video_id: input.videoId,
+    job_id: input.jobId ?? null,
+    status: "queued",
+    progress: 0,
+    start_s: input.start,
+    end_s: input.end,
+    gameplay: input.gameplay ?? "none",
+    caption_preset: input.captionPreset ?? "hormozi",
+    caption_lines: input.captionLines ?? [],
+    moment: input.moment ?? null,
+    // Null when the candidate came from an analysis cached before genres
+    // existed; Stats classifies those the first time it sees them.
+    genre: asGenre(input.moment?.genre) ?? null,
+  };
+  const insert = (values: Record<string, unknown>) =>
+    supabase.from("clip_renders").insert(values).select("id").single();
+  let { data, error } = await insert(row);
+  // A database that hasn't had 009 applied has no genre column. Losing the
+  // genre is fine — Stats sorts it later — losing the render is not.
+  if (error && /genre/.test(error.message)) {
+    ({ data, error } = await insert({ ...row, genre: undefined }));
+  }
   if (error || !data) return null;
   return data.id as string;
 }
@@ -381,6 +389,7 @@ function asRender(row: {
   finished_at?: string | null;
   moment?: ClipCandidate | null;
   storage?: string | null;
+  genre?: string | null;
 }): ClipRender {
   return {
     id: row.id,
@@ -401,6 +410,7 @@ function asRender(row: {
     topic: row.moment?.topic,
     why: row.moment?.whyItClips,
     segmentCount: row.moment?.segments?.length,
+    genre: asGenre(row.genre) ?? null,
     storage: (row.storage as StorageProvider) ?? "supabase",
   };
 }

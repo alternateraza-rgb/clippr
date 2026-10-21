@@ -5,6 +5,7 @@ import { buildSegments, fit, TARGET_MAX_S, TARGET_MIN_S, totalDuration } from "@
 import { timedScript, type TranscriptResult } from "@/lib/agent/transcript";
 import { hasLlm } from "@/lib/config";
 import { completeJson } from "@/lib/llm/complete";
+import { asGenre, GENRE_IDS } from "@/lib/fixtures/niches";
 import { weightedScore } from "@/lib/format";
 import type { ClipCandidate, Niche, ScoreBreakdown, WordTiming } from "@/lib/agent/types";
 
@@ -99,6 +100,7 @@ function toStory(raw: unknown, words: WordTiming[]): ClipCandidate[] {
       hook: String(story.hook || segments[0].quote || "").slice(0, 220),
       whyItClips: String(story.whyItClips || story.why_it_clips || story.reason || "").slice(0, 500),
       topic: String(story.topic || story.title || "").slice(0, 200),
+      genre: asGenre(story.genre),
       segments,
       score: weightedScore(scores),
       scores,
@@ -123,11 +125,12 @@ const CLIP_SCHEMA = {
   schema: {
     type: "object",
     additionalProperties: false,
-    required: ["topic", "hook", "whyItClips", "scores", "segments"],
+    required: ["topic", "hook", "whyItClips", "genre", "scores", "segments"],
     properties: {
       topic: { type: "string" },
       hook: { type: "string" },
       whyItClips: { type: "string" },
+      genre: { type: "string", enum: GENRE_IDS },
       scores: {
         type: "object",
         additionalProperties: false,
